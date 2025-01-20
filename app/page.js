@@ -1,101 +1,75 @@
+'use client'
 import Image from "next/image";
+import HomeIcon from '@mui/icons-material/Home';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import MenuIcon from '@mui/icons-material/Menu';
+import BallotIcon from '@mui/icons-material/Ballot';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import SettingsIcon from '@mui/icons-material/Settings';
+import AddBoxIcon from '@mui/icons-material/AddBox';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { useRouter } from "next/navigation";
+import { useMediaQuery } from "@mui/material";
 
 export default function Home() {
+  const isSmallScreen = useMediaQuery('(max-width: 640px)');
+  const router=useRouter()
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div className="sm:m-[4vw] flex flex-col gap-5">
+   <div className="bg-white w-full h-[18vh] absolute top-0 left-0 rounded-lg flex flex-col text-black gap-5">
+    <div className="flex justify-between ">
+<StorefrontIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+<input type="text" className="w-[39vw] sm:w-[55vw] border-2 border-black bg-white"/>
+<NotificationsIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+<SettingsIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+    </div>
+    <div className="bg-white flex justify-between px-10">
+      <button className="border-2 border-black rounded-lg w-36 h-12">Transaction Deatils</button>
+      <button className="border-2 border-black rounded-lg w-36 h-12">Party Details</button>
+    </div>
+   </div>
+   <div className="bg-gray-500 w-full h-[21vh] mt-[20vh] sm:mt-[14vh] rounded-lg flex flex-col sm:p-4 gap-3">
+    <h2 className=" font-bold">Quick Links</h2>
+    <div className=" flex justify-between">
+      <div className="flex flex-col cursor-pointer  items-center justify-center">
+<AddBoxIcon  style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+<p className="">Add Txn</p>
+      </div>
+      <div className="flex flex-col cursor-pointer items-center justify-center">
+<ReceiptIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+<p className="">Sale Report</p>
+      </div>
+      <div className="flex flex-col cursor-pointer items-center justify-center">
+<SettingsIcon  style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+<p className="">Txn Settings</p>
+      </div>
+      <div className="flex flex-col cursor-pointer items-center justify-center">
+<ChevronRightIcon  style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+<p className="">Show All</p>
+      </div>
+    </div>
+   </div>
+   <div className="bg-white w-full h-[19vh] rounded-lg">helo</div> 
+   <div className="bg-white w-full h-[12vh] rounded-lg absolute bottom-0 left-0 flex items-center gap-10 justify-between p-5 sm:gap-7">
+   <div className="flex flex-col w-[7vw] text-black  items-center justify-center bg-white">
+    <HomeIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}} className=""/>
+    <p className="text-lg bg-white">Home</p>
+    </div> 
+   <div className="flex flex-col w-[7vw] text-black items-center justify-center cursor-pointer bg-white">
+<DashboardIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+    <p className="text-lg bg-white">Dashboard</p>
+    </div> 
+   <div className="flex flex-col w-[7vw] text-black items-center justify-center bg-white">
+<BallotIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+    <p className="text-lg bg-white">Item</p>
+    </div> 
+   <div className="flex flex-col w-[7vw] text-black items-center justify-center cursor-pointer bg-white" onClick={()=>router.push('/menu')}>
+<MenuIcon style={{fontSize: isSmallScreen ? '30px' : '60px'}}/>
+    <p className="text-lg bg-white">Menu</p>
+    </div> 
+    </div> 
     </div>
   );
 }
