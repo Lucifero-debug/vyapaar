@@ -235,10 +235,22 @@ const phone=selectedCustomer.phone
           selectedItem.map((items,index)=>(
             <div className='flex gap-4 items-center ml-3' key={index}>
             <h1 className='font-semibold text-lg'>{items.name}</h1>
-            <h1 className='font-semibold text-lg'>Quantity {items.quantity}</h1>
-            <h1 className='font-semibold text-lg'>Rate {items.cost}</h1>
-            <h1 className='font-semibold text-lg'>Discount {items.discount}%</h1>
-            <h1 className='font-semibold text-lg'>Total {items.cost*items.quantity}</h1>
+            <h1 className='font-semibold text-lg'>Quantity:{items.quantity}</h1>
+            <input
+  className='w-12 font-semibold text-lg'
+  type="number"
+  value={items.cost || ''}
+  onChange={(e) => {
+    const newValue = e.target.value;
+    setSelectedItem(prev => 
+      prev.map((item, idx) => 
+        idx === index ? { ...item, cost: newValue } : item
+      )
+    );
+  }}
+/>
+            <h1 className='font-semibold text-lg'>Discount:{items.discount}%</h1>
+            <h1 className='font-semibold text-lg'>Total:{items.cost*items.quantity}</h1>
             <button className='border-2 border-black rounded-4xl active:scale-125' onClick={()=>handleRemove(index)}>X</button>
                     </div>
           ))

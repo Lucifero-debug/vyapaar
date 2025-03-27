@@ -1,23 +1,22 @@
+// main.js
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
-let win;
+let mainWindow;
 
 function createWindow() {
-  win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
-      nodeIntegration: false,
-      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: true,
     },
   });
 
-  // Load the static files from the `out` directory
-  win.loadFile(path.join(__dirname, 'out', 'index.html'));
-
-  win.on('closed', () => {
-    win = null;
+  mainWindow.loadURL('https://vyapaar-ten.vercel.app/'); // URL of your Next.js app
+  
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 
