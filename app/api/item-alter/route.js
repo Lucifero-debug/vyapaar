@@ -21,7 +21,7 @@ export async function POST(req) {
                 salePrice: itemData.salePrice,
                 weight: itemData.weight,
                 itemType: itemData.itemType,
-                purchasePrice: itemData.purchasePrice,
+                purchasePrice: itemData.purchasePrice,  
                 gst: itemData.gst,
                 discount: itemData.discount,
                 group: itemData.group,

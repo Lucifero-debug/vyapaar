@@ -338,7 +338,7 @@ const addPartyTax = () => {
             received: Number(received) || 0,
             items: selectedItem,
             partyTaxes: partyTaxes,
-            type: "Sale"
+            type: "Purchase"
         };
 
         try {

@@ -1,5 +1,5 @@
 'use client'
-import React, { Suspense, useRef } from 'react'
+import React, { Suspense, useEffect, useRef, useState } from 'react'
 import AddIcCallOutlinedIcon from '@mui/icons-material/AddIcCallOutlined';
 import { useSearchParams } from 'next/navigation';
 import html2canvas from 'html2canvas';
@@ -14,11 +14,13 @@ const PageContent = () => {
     if (!contentRef.current) return null;
   
     try {
-      const canvas = await html2canvas(contentRef.current);
+      const canvas = await html2canvas(contentRef.current, { scale: 2 });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF();
-      pdf.addImage(imgData, "PNG", 10, 10, 180, 160);
-      return pdf.output("dataurlstring"); // Returns the PDF as a base64 string
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = 210;
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      return pdf.output("dataurlstring");
     } catch (error) {
       console.error("Error generating PDF:", error);
       return null;
@@ -40,7 +42,7 @@ const PageContent = () => {
         toEmail: "superstrong8700@gmail.com",
         subject: "Your Invoice from Prashant Enterprise",
         htmlContent: "<p>Please find your invoice attached.</p>",
-        pdfBase64: pdfBase64.split(",")[1], // Remove the dataurl prefix
+        pdfBase64: pdfBase64.split(",")[1],
       }),
     });
 
@@ -51,80 +53,143 @@ const PageContent = () => {
     }
   };
   
-
-
   const invoiceNo = searchParams.get('invoiceNo');
   const date = searchParams.get('date');
   const customer = searchParams.get('customer');
   const phone = searchParams.get('phone');
   const taxType = searchParams.get('taxType');
-  const totalAmount = searchParams.get('totalAmount');
+  const finalAmount = parseFloat(searchParams.get('finalAmount'));
+  const gstAmount = parseFloat(searchParams.get('gstAmount'));
   const gst = parseInt(searchParams.get('gst'));
   const received = parseFloat(searchParams.get('received'));
   const balanceDue = parseFloat(searchParams.get('balanceDue'));
   const stateOfSupply = searchParams.get('stateOfSupply');
   const items = JSON.parse(decodeURIComponent(searchParams.get('items')));
+  const partyTaxes = JSON.parse(decodeURIComponent(searchParams.get('partyTaxes')));
 
-  console.log("project",customer)
 
   return (
     <>
-    <div className="p-8 bg-white border rounded-lg" ref={contentRef}>
-      <h1 className="text-2xl font-bold bg-white">Prashant enterprise</h1>
-      <div className='bg-white flex mt-4'>
-        <AddIcCallOutlinedIcon style={{background:'white'}}/>
-        &nbsp;87007237742
-      </div>
-      <hr className="my-4 bg-black" />
-      <p className='bg-white'>Invoice Number: {invoiceNo}</p>
-      <p className='bg-white'>Date: {date}</p>
-      <p className='bg-white'>Customer: {customer}</p>
-      <p className='bg-white'>Phone No: {phone}</p>
-      <p className='bg-white'>State: {stateOfSupply}</p>
-      <hr className="my-4" />
-      <table className="w-full border-collapse">
-        <thead className='bg-gray-500'>
-          <tr>
-            <th className="border p-2 bg-gray-400">Item</th>
-            <th className="border p-2 bg-gray-400">Quantity</th>
-            <th className="border p-2 bg-gray-400">Price</th>
-            <th className="border p-2 bg-gray-400">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, index) => (
-            <tr key={index}>
-              <td className="border p-2 bg-gray-300">{item.name}</td>
-              <td className="border p-2 bg-gray-300">{item.quantity}</td>
-              <td className="border p-2 bg-gray-300">
-                <div className='flex flex-col'>
-                  <p className='bg-gray-300'>₹{item.cost}</p>
-                  <p className='bg-gray-300'>Discount: {item.discount}%</p>
-                </div>
-              </td>
-              <td className="border p-2 bg-gray-300">₹{item.quantity*item.cost-(item.quantity*item.cost*(item.discount/100))}</td>
+      <div 
+        ref={contentRef} 
+        className="max-w-3xl mx-auto bg-white p-8 border border-gray-300 rounded-md shadow-sm text-gray-900 font-sans"
+        style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
+      >
+        {/* Header */}
+        <header className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-extrabold text-gray-800 tracking-wide">Prashant Enterprise</h1>
+            <p className="mt-1 text-sm text-gray-600">GSTIN: 12ABCDE3456F7Z8</p>
+            <p className="mt-1 text-gray-700 flex items-center gap-1">
+              <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 237742
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Invoice No:</p>
+            <p className="font-semibold text-lg">{invoiceNo}</p>
+            <p className="text-sm text-gray-500 mt-2">Date:</p>
+            <p className="font-semibold">{date}</p>
+          </div>
+        </header>
+
+        {/* Customer Info */}
+        <section className="mb-6 grid grid-cols-2 gap-x-8 gap-y-2 border-t border-b border-gray-300 py-4">
+          <div>
+            <h2 className="font-semibold text-gray-700">Bill To:</h2>
+            <p className="mt-1">{customer}</p>
+            <p>{phone}</p>
+            <p>{stateOfSupply}</p>
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-700">Tax Details:</h2>
+            <p className="mt-1">Tax Type: {taxType}</p>
+            {taxType === 'local' ? (
+              <>
+                <p>SGST: {(gst/2).toFixed(2)}%</p>
+                <p>CGST: {(gst/2).toFixed(2)}%</p>
+              </>
+            ) : (
+              <p>IGST: {gst}%</p>
+            )}
+          </div>
+        </section>
+
+        {/* Items Table */}
+        <table className="w-full border-collapse mb-6">
+          <thead>
+            <tr className="bg-gray-100 border-b border-gray-300">
+              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">Item</th>
+              <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700">Quantity</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Price (₹)</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Discount (%)</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Amount (₹)</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="text-right font-bold mt-4 bg-white">Total: ₹{totalAmount}</p>
-      <p className="text-right bg-white">Received: ₹{received.toFixed(2)}</p>
-      <p className="text-right bg-white">Balance: ₹{balanceDue.toFixed(2)}</p>
-      {taxType=='local'?(
-        <>
-        <p className="text-right bg-white">Tax IGST {gst/2}%</p>
-        <p className="text-right bg-white">Tax CGST {gst/2}%</p>
-        </>
-      ):(
-        <p className="text-right bg-white">Tax CGST {gst}%</p>
-      )}
-      <p className='bg-white mt-6'>Thanks For Doing Business With Us</p>
-    </div>
-    <div className='w-full bg-white flex items-center justify-center'>
-      <button className='w-[24vw] sm:w-[8vw] h-[8vh] sm:h-[6vh] bg-red-500' onClick={sendInvoice}>Generate Image</button>
-    </div>
+          </thead>
+          <tbody>
+            {items.map((item, i) => {
+              const grossAmount = item.quantity * item.cost;
+              const discountAmount = grossAmount * (item.discount / 100);
+              const netAmount = grossAmount - discountAmount;
+
+              return (
+                <tr key={i} className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="py-3 px-4 text-gray-800">{item.name}</td>
+                  <td className="py-3 px-4 text-center">{item.quantity}</td>
+                  <td className="py-3 px-4 text-right">₹{item.cost.toFixed(2)}</td>
+                  <td className="py-3 px-4 text-right">{item.discount.toFixed(2)}%</td>
+                  <td className="py-3 px-4 text-right font-semibold">₹{netAmount.toFixed(2)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+{partyTaxes?.length > 0 && (
+  <section className="max-w-xs ml-auto mt-4 text-right space-y-1">
+    <h3 className="text-md font-semibold text-gray-700 mb-2">Additional Taxes:</h3>
+    {partyTaxes.map((tax, idx) => (
+      <div key={idx} className="text-sm text-gray-600 flex justify-between">
+        <span>{tax.name} ({tax.rate ? `${tax.rate}%` : `₹${tax.amount}`}):</span>
+        <span>₹{parseFloat(tax.total).toFixed(2)}</span>
+      </div>
+    ))}
+  </section>
+)}
+
+
+        {/* Summary */}
+        <section className="max-w-xs ml-auto text-right space-y-1">
+          <p className="text-gray-700 text-lg font-semibold">Total: ₹{parseFloat(finalAmount).toFixed(2)}</p>
+          <p className="text-gray-600">Received: ₹{received.toFixed(2)}</p>
+          <p className="text-gray-600">Balance Due: ₹{balanceDue.toFixed(2)}</p>
+           {taxType === 'local' ? (
+              <>
+                <p>SGST: {(gstAmount/2).toFixed(2)}</p>
+                <p>CGST: {(gstAmount/2).toFixed(2)}</p>
+              </>
+            ) : (
+              <p>IGST: {gstAmount}</p>
+            )}
+        </section>
+
+        {/* Footer */}
+        <footer className="mt-12 border-t border-gray-300 pt-6 text-center text-gray-600 text-sm">
+          <p>Thank you for doing business with us.</p>
+          <p>Please contact us if you have any questions about this invoice.</p>
+        </footer>
+      </div>
+
+      {/* Button */}
+      <div className='w-full bg-white flex items-center justify-center mt-6'>
+        <button
+          onClick={sendInvoice}
+          className='w-[28vw] sm:w-[12vw] h-[8vh] sm:h-[6vh] bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-md transition-colors'
+          type="button"
+        >
+          Send Invoice
+        </button>
+      </div>
     </>
-  )
+  );
 }
 
 const page = () => {
