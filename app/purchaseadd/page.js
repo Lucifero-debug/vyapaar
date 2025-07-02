@@ -1,14 +1,16 @@
 'use client'
-import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import React, { Suspense, useEffect, useState } from 'react'
 import AddIcon from '@mui/icons-material/Add';
 // import TotalSale from '@/models/totalSales';
 import { saveToLocal, getFromLocal, clearInvoiceDraft } from '@/lib/localStorageHelper'
+import InvoiceSearchParams from '@/components/suspense';
+
+export const dynamic = 'force-dynamic';
 
 const page = () => {
     const router = useRouter()
-    const searchParams = useSearchParams()
-    const value = searchParams.get('value'); 
+   const [value, setValue] = useState('');
     
     // Initialize states with proper default values
     const [invoiceNo, setInvoiceNo] = useState(4)
@@ -39,6 +41,7 @@ const page = () => {
     const [partyTaxes, setPartyTaxes] = useState([])
     const [newTaxName, setNewTaxName] = useState('')
     const [newTaxRate, setNewTaxRate] = useState('')
+
 
     // Helper function to format date
     const formatDate = (dateString) => {
@@ -196,46 +199,6 @@ useEffect(() => {
         }
     }, [gst]);
 
-    // Add party tax function
-//     const addPartyTax = () => {
-//         if (!newTaxName || (!newTaxRate && !newTaxAmount)) {
-//             alert('Please enter Tax Name and either Rate or Amount.');
-//             return;
-//         }
-
-//         if (newTaxRate && newTaxAmount) {
-//             alert('Enter either Rate or Amount, not both.');
-//             return;
-//         }
-
-//         const baseAmount = parseFloat(totalAmount) || 0;
-//         let taxTotal = 0;
-//         let taxRate = '';
-//         let taxAmount = '';
-
-//         if (newTaxRate) {
-//             taxRate = parseFloat(newTaxRate);
-//             taxTotal = (baseAmount * taxRate) / 100;
-//         }
-
-//         if (newTaxAmount) {
-//             taxAmount = parseFloat(newTaxAmount);
-//             taxTotal = taxAmount;
-//         }
-
-//         const newTax = {
-//             name: newTaxName,
-//             rate: taxRate || '',
-//             amount: taxAmount || '',
-//             total: taxTotal.toFixed(2),
-//         };
-// setPartyTaxes(prev => [...prev, newTax]);
-// console.log("accept",balanceDue)
-//         // Reset fields
-//         setNewTaxName('');
-//         setNewTaxRate('');
-//         setNewTaxAmount('');
-//     };
 const addPartyTax = () => {
   if (!newTaxName || (!newTaxRate && !newTaxAmount)) {
     alert('Enter Tax Name and either Rate or Amount');
@@ -466,6 +429,10 @@ useEffect(() => {
     }, []);
 
     return (
+        <>
+            <Suspense fallback={null}>
+        <InvoiceSearchParams onValue={setValue} />
+      </Suspense>        
         <div className='flex flex-col gap-6 p-6 bg-gray-50 min-h-screen'>
             {/* Invoice & Date */}
             <div className='flex gap-6'>
@@ -834,6 +801,7 @@ useEffect(() => {
                 Save Invoice
             </button>
         </div>
+        </>
     )
 }
 
