@@ -473,7 +473,7 @@ setItem(
         <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/voucher')}>
   🧾 Voucher
 </div>
-        <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full">
+        <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/setup')}>
 <SettingsApplicationsIcon/>  Setup
 </div>
 

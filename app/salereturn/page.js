@@ -1,17 +1,25 @@
 'use client'
-import { useRouter } from 'next/navigation'
+import { useRouter} from 'next/navigation'
 import React, { Suspense, useEffect, useState } from 'react'
 import AddIcon from '@mui/icons-material/Add';
 // import TotalSale from '@/models/totalSales';
 import { saveToLocal, getFromLocal, clearInvoiceDraft } from '@/lib/localStorageHelper'
 import InvoiceSearchParams from '@/components/suspense';
+import { useSaleOptions } from '@/context/SaleOptionContext';
 
 export const dynamic = 'force-dynamic';
 
 const page = () => {
     const router = useRouter()
    const [value, setValue] = useState('');
-    
+     const { options } = useSaleOptions();
+     const [showShippedPopup, setShowShippedPopup] = useState(false);
+const [shippedTo, setShippedTo] = useState('');
+
+const [showDispatchPopup, setShowDispatchPopup] = useState(false);
+const [dispatchFrom, setDispatchFrom] = useState('');
+      const [showDescPopup, setShowDescPopup] = useState(false);
+  const [descriptionText, setDescriptionText] = useState('');
     // Initialize states with proper default values
     const [invoiceNo, setInvoiceNo] = useState(4)
     const [date, setDate] = useState(new Date().toISOString().substring(0, 10))
@@ -178,46 +186,6 @@ useEffect(() => {
         }
     }, [gst]);
 
-    // Add party tax function
-//     const addPartyTax = () => {
-//         if (!newTaxName || (!newTaxRate && !newTaxAmount)) {
-//             alert('Please enter Tax Name and either Rate or Amount.');
-//             return;
-//         }
-
-//         if (newTaxRate && newTaxAmount) {
-//             alert('Enter either Rate or Amount, not both.');
-//             return;
-//         }
-
-//         const baseAmount = parseFloat(totalAmount) || 0;
-//         let taxTotal = 0;
-//         let taxRate = '';
-//         let taxAmount = '';
-
-//         if (newTaxRate) {
-//             taxRate = parseFloat(newTaxRate);
-//             taxTotal = (baseAmount * taxRate) / 100;
-//         }
-
-//         if (newTaxAmount) {
-//             taxAmount = parseFloat(newTaxAmount);
-//             taxTotal = taxAmount;
-//         }
-
-//         const newTax = {
-//             name: newTaxName,
-//             rate: taxRate || '',
-//             amount: taxAmount || '',
-//             total: taxTotal.toFixed(2),
-//         };
-// setPartyTaxes(prev => [...prev, newTax]);
-// console.log("accept",balanceDue)
-//         // Reset fields
-//         setNewTaxName('');
-//         setNewTaxRate('');
-//         setNewTaxAmount('');
-//     };
 const addPartyTax = () => {
   if (!newTaxName || (!newTaxRate && !newTaxAmount)) {
     alert('Enter Tax Name and either Rate or Amount');
@@ -296,7 +264,7 @@ const addPartyTax = () => {
     }, [])
 
     // Save invoice function
-    const handleSave = async () => {
+    const submitInvoice = async () => {
         const encodedItems = encodeURIComponent(JSON.stringify(selectedItem));
         const encodedParty = encodeURIComponent(JSON.stringify(partyTaxes));
         const phone = selectedCustomer.phone;
@@ -320,6 +288,8 @@ const addPartyTax = () => {
             received: Number(received) || 0,
             items: selectedItem,
             partyTaxes: partyTaxes,
+             shippedTo,
+  dispatchFrom,
             type: "Sale",
             return:true
         };
@@ -371,7 +341,9 @@ const addPartyTax = () => {
                     taxType,
                     gst,
                     items: encodedItems,
-                    partyTaxes:encodedParty
+                    partyTaxes:encodedParty,
+                     shippedTo,
+  dispatchFrom
                 }).toString();
 
                 router.push(`/invoice?${query}`);
@@ -383,6 +355,36 @@ const addPartyTax = () => {
             alert('Error saving invoice');
         }
     };
+
+    const handleSave = () => {
+  if (options.shipped) {
+    setShowShippedPopup(true);
+    return;
+  }
+
+  if (options.dispatch) {
+    setShowDispatchPopup(true);
+    return;
+  }
+
+  // If neither option is ON, submit directly
+  submitInvoice();
+};
+
+const handleShippedSave = () => {
+  setShowShippedPopup(false);
+  if (options.dispatch) {
+    setShowDispatchPopup(true);
+  } else {
+    submitInvoice();
+  }
+};
+
+const handleDispatchSave = () => {
+  setShowDispatchPopup(false);
+  submitInvoice();
+};
+
 
     // Calculate totals
     useEffect(() => {
@@ -415,7 +417,11 @@ useEffect(() => {
     const saveItem = (e) => {
         const selectedName = e.target.value;
         const selectedItems = item.find((i) => i.name === selectedName);
-
+         if (!selectedItems) return;
+        if (options.description) {
+    setShowDescPopup(true);
+    return;
+  }
         if (selectedItems) {
             const rateValue = rate || selectedItems.cost;
             const quantityValue = quantity || 1;
@@ -437,6 +443,34 @@ useEffect(() => {
         setRate('');
         setDiscount('');
     };
+   const handleSaveDescription = () => {
+  const selectedItems = item.find((i) => i.name === itemName);
+  if (!selectedItems) return;
+
+  const rateValue = rate || selectedItems.cost;
+  const quantityValue = quantity || 1;
+
+  const newItem = {
+    ...selectedItems,
+    description: descriptionText,
+    quantity: quantityValue,
+    cost: rateValue,
+    discount: discount || 0,
+    total: rateValue * quantityValue - (rateValue * quantityValue * (discount || 0)) / 100,
+  };
+
+  setSelectedItem([...selectedItem, newItem]);
+
+  // Reset all
+  setShowDescPopup(false);
+  setItemName('');
+  setQuantity('');
+  setRate('');
+  setDiscount('');
+  setDescriptionText('');
+};
+
+
 
     // Clear localStorage on page unload
     useEffect(() => {
@@ -450,7 +484,7 @@ useEffect(() => {
 
     return (
         <>
-                   <Suspense fallback={null}>
+                    <Suspense fallback={null}>
                 <InvoiceSearchParams onValue={setValue} />
               </Suspense>
         <div className='flex flex-col gap-6 p-6 bg-gray-50 min-h-screen'>
@@ -535,7 +569,34 @@ useEffect(() => {
                     </select>
                 </div>
             </div>
-
+            {showDescPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
+      <h2 className="text-lg font-semibold mb-4">Add Product Description</h2>
+      <textarea
+        value={descriptionText}
+        onChange={(e) => setDescriptionText(e.target.value)}
+        rows={4}
+        className="w-full border px-3 py-2 rounded-lg mb-4"
+        placeholder="Enter description here..."
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setShowDescPopup(false)}
+          className="px-4 py-2 bg-gray-300 rounded"
+        >
+          Cancel
+        </button>
+        <button
+           onClick={handleSaveDescription}
+          className="px-4 py-2 bg-blue-600 text-white rounded"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+)}
             {/* Payment & Supply Section */}
  <div className="flex gap-6 flex-wrap">
   {/* Total Summary Card */}
@@ -820,6 +881,45 @@ useEffect(() => {
             >
                 Save Invoice
             </button>
+
+        {showShippedPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
+      <h2 className="text-lg font-semibold mb-4">Enter Shipped To</h2>
+      <input
+        type="text"
+        value={shippedTo}
+        onChange={(e) => setShippedTo(e.target.value)}
+        placeholder="Shipping address"
+        className="w-full border px-3 py-2 rounded-lg mb-4"
+      />
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setShowShippedPopup(false)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+        <button onClick={handleShippedSave} className="px-4 py-2 bg-blue-600 text-white rounded">Next</button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showDispatchPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
+      <h2 className="text-lg font-semibold mb-4">Enter Dispatch From</h2>
+      <input
+        type="text"
+        value={dispatchFrom}
+        onChange={(e) => setDispatchFrom(e.target.value)}
+        placeholder="Dispatch location"
+        className="w-full border px-3 py-2 rounded-lg mb-4"
+      />
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setShowDispatchPopup(false)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+        <button onClick={handleDispatchSave} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+      </div>
+    </div>
+  </div>
+)}
+
         </div>
         </>
     )

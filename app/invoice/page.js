@@ -66,6 +66,9 @@ const PageContent = () => {
   const stateOfSupply = searchParams.get('stateOfSupply');
   const items = JSON.parse(decodeURIComponent(searchParams.get('items')));
   const partyTaxes = JSON.parse(decodeURIComponent(searchParams.get('partyTaxes')));
+  const shippedTo = searchParams.get("shippedTo");
+const dispatchFrom = searchParams.get("dispatchFrom");
+
 
 
   return (
@@ -99,6 +102,12 @@ const PageContent = () => {
             <p className="mt-1">{customer}</p>
             <p>{phone}</p>
             <p>{stateOfSupply}</p>
+              {shippedTo && (
+      <>
+        <h2 className="font-semibold text-gray-700 mt-4">Shipped To:</h2>
+        <p>{shippedTo}</p>
+      </>
+    )}
           </div>
           <div>
             <h2 className="font-semibold text-gray-700">Tax Details:</h2>
@@ -111,6 +120,12 @@ const PageContent = () => {
             ) : (
               <p>IGST: {gst}%</p>
             )}
+               {dispatchFrom && (
+      <>
+        <h2 className="font-semibold text-gray-700 mt-4">Dispatch From:</h2>
+        <p>{dispatchFrom}</p>
+      </>
+    )}
           </div>
         </section>
 
@@ -125,23 +140,33 @@ const PageContent = () => {
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Amount (₹)</th>
             </tr>
           </thead>
-          <tbody>
-            {items.map((item, i) => {
-              const grossAmount = item.quantity * item.cost;
-              const discountAmount = grossAmount * (item.discount / 100);
-              const netAmount = grossAmount - discountAmount;
+    <tbody>
+  {items.map((item, i) => {
+    const grossAmount = item.quantity * item.cost;
+    const discountAmount = grossAmount * (item.discount / 100);
+    const netAmount = grossAmount - discountAmount;
 
-              return (
-                <tr key={i} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-gray-800">{item.name}</td>
-                  <td className="py-3 px-4 text-center">{item.quantity}</td>
-                  <td className="py-3 px-4 text-right">₹{item.cost.toFixed(2)}</td>
-                  <td className="py-3 px-4 text-right">{item.discount.toFixed(2)}%</td>
-                  <td className="py-3 px-4 text-right font-semibold">₹{netAmount.toFixed(2)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
+    return (
+      <React.Fragment key={i}>
+        <tr className="border-b border-gray-200 hover:bg-gray-50">
+          <td className="py-3 px-4 text-gray-800">{item.name}</td>
+          <td className="py-3 px-4 text-center">{item.quantity}</td>
+          <td className="py-3 px-4 text-right">₹{item.cost.toFixed(2)}</td>
+          <td className="py-3 px-4 text-right">{item.discount.toFixed(2)}%</td>
+          <td className="py-3 px-4 text-right font-semibold">₹{netAmount.toFixed(2)}</td>
+        </tr>
+        {item.description && (
+          <tr className="border-b border-gray-200 bg-gray-50">
+            <td colSpan={5} className="px-4 py-2 text-sm italic text-gray-600">
+              Description: {item.description}
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    );
+  })}
+</tbody>
+
         </table>
 {partyTaxes?.length > 0 && (
   <section className="max-w-xs ml-auto mt-4 text-right space-y-1">

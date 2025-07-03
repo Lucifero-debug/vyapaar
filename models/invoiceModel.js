@@ -6,6 +6,7 @@ const itemSchema = new mongoose.Schema({
   cost: { type: Number, required: true },
   discount: { type: Number, required: true },
   total: { type: Number, required: true },
+  description: {type: String}
 });
 
 const partyTaxSchema = new mongoose.Schema({
@@ -37,6 +38,12 @@ const invoiceSchema = new mongoose.Schema(
     finalAmount: { type: Number, required: true },
     received: { type: Number, required: true },
     balanceDue: { type: Number, required: true },
+      dispatchfrom: {
+      name: { type: String },
+    },
+      billedTo: {
+      name: { type: String },
+    },
 
     items: [itemSchema],
 
