@@ -65,27 +65,6 @@ useEffect(() => {
   fetchInvoiceNo();
 }, []);
 
-
-    // Load from localStorage on component mount
-    useEffect(() => {
-        // Only run on client side
-        if (typeof window !== 'undefined') {
-            const loadFromStorage = () => {
-                setSelectedItem(getFromLocal('invoiceItems', []))
-                setPartyTaxes(getFromLocal('partyTaxes', []))
-                setInvoiceNo(getFromLocal('invoiceNo',0))
-                setDate(getFromLocal('date', new Date().toISOString().substring(0, 10)))
-                setGst(getFromLocal('gst', 0))
-                setPaymentType(getFromLocal('paymentType', 'Cash'))
-                setStateOfSupply(getFromLocal('stateOfSupply', 'Delhi'))
-                setTaxType(getFromLocal('taxType', 'local'))
-                setReceived(getFromLocal('received', ''))
-            }
-            
-            loadFromStorage()
-        }
-    }, [])
-
     // Load existing invoice data if value parameter exists
     useEffect(() => {
          if (!value) return; // ⛔ prevent fetch if value is not set yet
