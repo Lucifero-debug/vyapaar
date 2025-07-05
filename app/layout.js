@@ -30,7 +30,6 @@ export default function RootLayout({ children }) {
         <SaleOptionProvider>
     <div className="flex items-center gap-4 p-4 bg-gray-100 shadow-md sticky top-0 z-50">
             <Backbutton />
-            <NextButton />
             <ReloadButton />
           </div>
         {children}

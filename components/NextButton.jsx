@@ -7,7 +7,7 @@ const NextButton = () => {
   const router = useRouter();
 
   return (
-    <button onClick={() => router.push('/nextpage')}>
+    <button onClick={() => router.next()}>
       <ArrowForwardIcon sx={{ fontSize: '40px' }} />
     </button>
   );
