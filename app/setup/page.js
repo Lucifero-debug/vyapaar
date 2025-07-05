@@ -13,22 +13,23 @@ const Page = () => {
     }));
   };
 
+  const optionLabels = {
+    description: 'Description for Products',
+    shipped: 'Shipped To',
+    dispatch: 'Dispatch From',
+    calculateByPack: 'Enable Quantity = Per Pack × No. of Packs', // ✅ NEW LABEL
+  };
+
   return (
     <div className="p-6 max-w-xl mx-auto bg-white rounded-lg shadow-lg border">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Invoice Option Toggles</h2>
       <div className="flex flex-col gap-4">
-        {['description', 'shipped', 'dispatch'].map((key) => (
+        {Object.keys(optionLabels).map((key) => (
           <label
             key={key}
             className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-md border hover:shadow transition-all"
           >
-            <span className="text-gray-700 text-base font-medium">
-              {key === 'description'
-                ? 'Description for Products'
-                : key === 'shipped'
-                ? 'Shipped To'
-                : 'Dispatch From'}
-            </span>
+            <span className="text-gray-700 text-base font-medium">{optionLabels[key]}</span>
             <input
               type="checkbox"
               name={key}

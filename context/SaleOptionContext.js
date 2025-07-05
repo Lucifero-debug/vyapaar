@@ -9,6 +9,7 @@ export const SaleOptionProvider = ({ children }) => {
     description: false,
     shipped: false,
     dispatch: false,
+     calculateByPack: false,
   });
 
   useEffect(() => {

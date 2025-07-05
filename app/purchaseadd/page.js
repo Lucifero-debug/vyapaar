@@ -18,7 +18,10 @@ const [shippedTo, setShippedTo] = useState('');
 
 const [showDispatchPopup, setShowDispatchPopup] = useState(false);
 const [dispatchFrom, setDispatchFrom] = useState('');
+const [quantityPerPack, setQuantityPerPack] = useState(0);
+const [noOfPack, setNoOfPack] = useState(0);
       const [showDescPopup, setShowDescPopup] = useState(false);
+      const [showQuantityPack, setShowQuantityPack] = useState(false);
   const [descriptionText, setDescriptionText] = useState('');
     // Initialize states with proper default values
     const [invoiceNo, setInvoiceNo] = useState(4)
@@ -385,6 +388,7 @@ const handleDispatchSave = () => {
 };
 
 
+
     // Calculate totals
     useEffect(() => {
         const newTotal = selectedItem.reduce((acc, item) => acc + (parseFloat(item.total) || 0), 0);
@@ -421,6 +425,12 @@ useEffect(() => {
     setShowDescPopup(true);
     return;
   }
+console.log("tumha",options)
+     if (options.calculateByPack) {
+   setShowQuantityPack(true)
+    return;
+  }
+
         if (selectedItems) {
             const rateValue = rate || selectedItems.cost;
             const quantityValue = quantity || 1;
@@ -467,6 +477,30 @@ useEffect(() => {
   setRate('');
   setDiscount('');
   setDescriptionText('');
+};
+
+   const handleQuantityPackSave = () => {
+  const selectedItems = item.find((i) => i.name === itemName);
+  if (!selectedItems) return;
+
+  const rateValue = rate || selectedItems.cost;
+  const quantityValue = noOfPack*quantityPerPack;
+
+  const newItem = {
+    ...selectedItems,
+    description: descriptionText,
+    quantity: quantityValue,
+    cost: rateValue,
+    discount: discount || 0,
+    total: rateValue * quantityValue - (rateValue * quantityValue * (discount || 0)) / 100,
+  };
+
+  setSelectedItem([...selectedItem, newItem]);
+
+  // Reset all
+  setShowQuantityPack(false);
+  setNoOfPack(0);
+  setQuantityPerPack(0);
 };
 
 
@@ -596,6 +630,38 @@ useEffect(() => {
     </div>
   </div>
 )}
+
+{showQuantityPack && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
+        <div className='flex'>
+      <h2 className="text-lg font-semibold mb-4">Enter Quantity Per Pack</h2>
+      <input
+        type="number"
+        value={quantityPerPack}
+        onChange={(e) => setQuantityPerPack(e.target.value)}
+        placeholder="Dispatch location"
+        className="w-full border px-3 py-2 rounded-lg mb-4"
+      />
+        </div>
+        <div className='flex'>
+      <h2 className="text-lg font-semibold mb-4">Enter No Of Packs</h2>
+      <input
+        type="number"
+        value={noOfPack}
+        onChange={(e) => setNoOfPack(e.target.value)}
+        placeholder="Dispatch location"
+        className="w-full border px-3 py-2 rounded-lg mb-4"
+      />
+        </div>
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setShowQuantityPack(false)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+        <button onClick={handleQuantityPackSave} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+      </div>
+    </div>
+  </div>
+)}
+
             {/* Payment & Supply Section */}
  <div className="flex gap-6 flex-wrap">
   {/* Total Summary Card */}
