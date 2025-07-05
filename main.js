@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow,Menu } = require('electron');
 const path = require('path');
 
 let mainWindow;
@@ -14,6 +14,9 @@ function createWindow() {
   });
 
   mainWindow.loadURL('https://vyapaar-ten.vercel.app/'); // URL of your Next.js app
+
+    Menu.setApplicationMenu(null);
+     mainWindow.setMenuBarVisibility(false);
   
   mainWindow.on('closed', () => {
     mainWindow = null;

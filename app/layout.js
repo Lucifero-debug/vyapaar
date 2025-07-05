@@ -2,6 +2,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Backbutton from "@/components/Backbutton";
+import NextButton from "@/components/NextButton";
+import ReloadButton from "@/components/ReloadButton";
 import { SaleOptionProvider } from '@/context/SaleOptionContext';
 
 const geistSans = Geist({
@@ -26,7 +28,11 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SaleOptionProvider>
-        <Backbutton/>
+    <div className="flex items-center gap-4 p-4 bg-gray-100 shadow-md sticky top-0 z-50">
+            <Backbutton />
+            <NextButton />
+            <ReloadButton />
+          </div>
         {children}
         </SaleOptionProvider>
       </body>
