@@ -100,6 +100,7 @@ useEffect(() => {
             .then(res => res.json())
             .then(res => {
                 const data = res.final;
+                console.log("maahiya",data)
                 setInvoiceNo(data.invoiceNo || 4);
                 setDate(data.date ? formatDate(data.date) : new Date().toISOString().substring(0, 10));
                 setId(data._id);
@@ -485,6 +486,7 @@ useEffect(() => {
                 quantity: quantityValue,
                 cost: rateValue || 2,
                 discount: discount || 0,
+                  hsn: selectedItems.hsn || '',
                 total: (rateValue * quantityValue) - ((rateValue * quantityValue) * (discount || 0) / 100),
             };
 

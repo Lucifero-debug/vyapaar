@@ -7,7 +7,7 @@ const itemSchema = new mongoose.Schema({
   discount: { type: Number, required: true },
   total: { type: Number, required: true },
   description: {type: String},
-  hsn:{type:Number}
+  hsn:{type:String}
 });
 
 const partyTaxSchema = new mongoose.Schema({
