@@ -42,6 +42,7 @@ const Page = () => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [customer, setCustomer] = useState([]);
+  const [totalSalesAmount, setTotalSalesAmount] = useState(0);
   const [saleInvoices, setSaleInvoices] = useState([]);
   const [purchaseInvoices, setPurchaseInvoices] = useState([]);
   const [saleReturns, setSaleReturns] = useState([]);
@@ -88,6 +89,7 @@ setItem(
         const invoices = invData.invoice || [];
         const saleInv = invoices.filter(inv => inv.type === 'Sale' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
+            totalAmount: inv.totalAmount || 0,
         }));
         const purchaseInv = invoices.filter(inv => inv.type === 'Purchase' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
@@ -98,6 +100,8 @@ setItem(
         const purchaseRet = invoices.filter(inv => inv.type === 'Purchase' && inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
         }));
+         const totalSales = saleInv.reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) || 0), 0);
+setTotalSalesAmount(totalSales);
 
 
         setSaleInvoices(saleInv);
@@ -235,7 +239,7 @@ setItem(
       <div className="bg-blue-600 rounded-lg shadow-lg p-6 text-white mb-6">
         <p className="text-lg font-semibold text-red-700 mb-2">Prashant Kumar</p>
         <p className="text-sm uppercase tracking-wider opacity-80">Total Sales</p>
-        <h2 className="text-4xl font-extrabold mt-2">₹350.00</h2>
+       <h2 className="text-4xl font-extrabold mt-2">₹{totalSalesAmount.toFixed(2)}</h2>
       </div>
 
       <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4">
