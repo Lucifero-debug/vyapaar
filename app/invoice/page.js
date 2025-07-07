@@ -26,6 +26,22 @@ const PageContent = () => {
       return null;
     }
   };
+  const downloadPDF = async () => {
+  const pdfBase64 = await generatePDF(contentRef);
+
+  if (!pdfBase64) {
+    alert("Failed to generate PDF");
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = pdfBase64;
+  link.download = `Invoice_${invoiceNo || "Prashant_Enterprise"}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 
   const sendInvoice = async () => {
     const pdfBase64 = await generatePDF(contentRef);
@@ -100,7 +116,7 @@ const orderDate=searchParams.get("orderDate")
       </p>
     </div>
       <div className="w-20 h-20 rounded-full overflow-hidden border border-gray-300 shadow-md flex-shrink-0">
-      <img src="https://yt3.googleusercontent.com/HxgiHavqWNI6ZLzqaiAI_mOiS6Cp0VKr-BarKsTR-9upQUcD8yv5k5J4rmPYQO8GhuhdscTT=s900-c-k-c0x00ffffff-no-rj" alt="Logo" className="w-full h-full object-cover" />
+      <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
     </div>
   </div>
           <div className="text-right">
@@ -267,11 +283,11 @@ const orderDate=searchParams.get("orderDate")
       {/* Button */}
       <div className='w-full bg-white flex items-center justify-center mt-6'>
         <button
-          onClick={sendInvoice}
+          onClick={downloadPDF}
           className='w-[28vw] sm:w-[12vw] h-[8vh] sm:h-[6vh] bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-md transition-colors'
           type="button"
         >
-          Send Invoice
+          Download Invoice
         </button>
       </div>
     </>
