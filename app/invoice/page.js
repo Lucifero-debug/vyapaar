@@ -9,24 +9,51 @@ const PageContent = () => {
 
   const searchParams = useSearchParams();
   const contentRef = useRef();
+const generatePDF = async (contentRef) => {
+  if (!contentRef.current) return null;
 
-  const generatePDF = async (contentRef) => {
-    if (!contentRef.current) return null;
-  
-    try {
-      const canvas = await html2canvas(contentRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = 210;
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      return pdf.output("dataurlstring");
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      return null;
+  try {
+    const canvas = await html2canvas(contentRef.current, {
+      scale: 2,
+      useCORS: true,
+      scrollY: -window.scrollY,
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+
+    const imgRatio = canvasHeight / canvasWidth;
+    const imgPDFHeight = pdfWidth * imgRatio;
+
+    let heightLeft = imgPDFHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgPDFHeight);
+    heightLeft -= pdfHeight;
+
+    while (heightLeft > 0) {
+      position = position - pdfHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgPDFHeight);
+      heightLeft -= pdfHeight;
     }
-  };
-  const downloadPDF = async () => {
+
+    // Return the PDF blob URL
+    return pdf.output("dataurlstring");
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    return null;
+  }
+};
+
+
+const downloadPDF = async () => {
   const pdfBase64 = await generatePDF(contentRef);
 
   if (!pdfBase64) {
@@ -36,7 +63,7 @@ const PageContent = () => {
 
   const link = document.createElement("a");
   link.href = pdfBase64;
-  link.download = `Invoice_${invoiceNo || "Prashant_Enterprise"}.pdf`;
+  link.download = `Invoice_${invoiceNo || "invoice"}.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
