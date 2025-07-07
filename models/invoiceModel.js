@@ -6,7 +6,8 @@ const itemSchema = new mongoose.Schema({
   cost: { type: Number, required: true },
   discount: { type: Number, required: true },
   total: { type: Number, required: true },
-  description: {type: String}
+  description: {type: String},
+  hsn:{type:Number}
 });
 
 const partyTaxSchema = new mongoose.Schema({
@@ -51,10 +52,12 @@ const invoiceSchema = new mongoose.Schema(
      transport: { type: String },         // Transport
     grNo: { type: String },              // Gr No.
     grDate: { type: Date },              // Date
+    orderDate: { type: Date },              // Date
     pvtMark: { type: String },           // Pvt Mark
     caseDetails: { type: String },       // Case
-    freight: { type: Number },           // Freight
+    freight: { type: String },           // Freight
     weight: { type: Number },            // Weight
+    orderNo: { type: Number },            // Weight
     ewayBillNo: { type: String },        // E-Way No.
     ewayBillDate: { type: Date },
     type:{ type: String, required: true },

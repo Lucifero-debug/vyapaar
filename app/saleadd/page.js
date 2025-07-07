@@ -15,8 +15,11 @@ const page = () => {
      const { options } = useSaleOptions();
      const [showShippedPopup, setShowShippedPopup] = useState(false);
 const [shippedTo, setShippedTo] = useState('');
+const [hsn,setHsn]=useState('')
 const [transport, setTransport] = useState('');
 const [grNo, setGrNo] = useState('');
+const [orderNo, setOrderNo] = useState('');
+const [orderDate, setOrderDate] = useState('');
 const [grDate, setGrDate] = useState('');
 const [pvtMark, setPvtMark] = useState('');
 const [caseDetails, setCaseDetails] = useState('');
@@ -115,13 +118,15 @@ useEffect(() => {
                 setDiscount(data.items?.discount || '');
                 setTaxType(data.taxType || 'local');
                 setPartyTaxes(data.partyTaxes || []);
-
+setHsn(data.items?.hsn || '')
                     setTransport(data.transport || '');
     setGrNo(data.grNo || '');
     setGrDate(data.grDate ? formatDate(data.grDate) : '');
     setPvtMark(data.pvtMark || '');
     setCaseDetails(data.caseDetails || '');
     setFreight(data.freight || '');
+    setOrderNo(data.orderNo || '')
+      setOrderDate(data.orderDate ? formatDate(data.orderDate) : '');
     setWeight(data.weight || '');
     setEwayBillNo(data.ewayBillNo || '');
     setEwayBillDate(data.ewayBillDate ? formatDate(data.ewayBillDate) : '');
@@ -320,7 +325,9 @@ const addPartyTax = () => {
   freight,
   weight,
   ewayBillNo,
-  ewayBillDate
+  ewayBillDate,
+  orderDate,
+  orderNo
         };
 
         try {
@@ -381,7 +388,9 @@ const addPartyTax = () => {
   freight,
   weight,
   ewayBillNo,
-  ewayBillDate
+  ewayBillDate,
+  orderNo,
+  orderDate
                 }).toString();
 
                 router.push(`/invoice?${query}`);
@@ -461,7 +470,6 @@ useEffect(() => {
     setShowDescPopup(true);
     return;
   }
-console.log("tumha",options)
      if (options.calculateByPack) {
    setShowQuantityPack(true)
     return;
@@ -580,13 +588,13 @@ console.log("tumha",options)
             </div>
 
             <div className="grid grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-md">
-  <div className="flex flex-col">
-    <label className="text-gray-600 font-medium mb-1">Transport</label>
+ <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">GR Date</label>
     <input
-      type="text"
+      type="date"
       className="h-10 px-3 border rounded-lg shadow-sm"
-      value={transport}
-      onChange={(e) => setTransport(e.target.value)}
+      value={grDate}
+      onChange={(e) => setGrDate(e.target.value)}
     />
   </div>
   <div className="flex flex-col">
@@ -599,12 +607,12 @@ console.log("tumha",options)
     />
   </div>
   <div className="flex flex-col">
-    <label className="text-gray-600 font-medium mb-1">GR Date</label>
+    <label className="text-gray-600 font-medium mb-1">Transport</label>
     <input
-      type="date"
+      type="text"
       className="h-10 px-3 border rounded-lg shadow-sm"
-      value={grDate}
-      onChange={(e) => setGrDate(e.target.value)}
+      value={transport}
+      onChange={(e) => setTransport(e.target.value)}
     />
   </div>
   <div className="flex flex-col">
@@ -628,19 +636,19 @@ console.log("tumha",options)
   <div className="flex flex-col">
     <label className="text-gray-600 font-medium mb-1">Freight</label>
     <input
-      type="number"
+      type="text"
       className="h-10 px-3 border rounded-lg shadow-sm"
       value={freight}
       onChange={(e) => setFreight(e.target.value)}
     />
   </div>
   <div className="flex flex-col">
-    <label className="text-gray-600 font-medium mb-1">Weight (kg)</label>
+    <label className="text-gray-600 font-medium mb-1">E-Way Bill Date</label>
     <input
-      type="number"
+      type="date"
       className="h-10 px-3 border rounded-lg shadow-sm"
-      value={weight}
-      onChange={(e) => setWeight(e.target.value)}
+      value={ewayBillDate}
+      onChange={(e) => setEwayBillDate(e.target.value)}
     />
   </div>
   <div className="flex flex-col">
@@ -652,13 +660,31 @@ console.log("tumha",options)
       onChange={(e) => setEwayBillNo(e.target.value)}
     />
   </div>
-  <div className="flex flex-col">
-    <label className="text-gray-600 font-medium mb-1">E-Way Bill Date</label>
+    <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Order Date</label>
     <input
       type="date"
       className="h-10 px-3 border rounded-lg shadow-sm"
-      value={ewayBillDate}
-      onChange={(e) => setEwayBillDate(e.target.value)}
+      value={orderDate}
+      onChange={(e) => setOrderDate(e.target.value)}
+    />
+  </div>
+    <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Order No</label>
+    <input
+      type="text"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={orderNo}
+      onChange={(e) => setOrderNo(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Weight (kg)</label>
+    <input
+      type="number"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={weight}
+      onChange={(e) => setWeight(e.target.value)}
     />
   </div>
 </div>
@@ -887,6 +913,7 @@ console.log("tumha",options)
                                     <th className='py-2 px-4 border border-gray-300'>Quantity</th>
                                     <th className='py-2 px-4 border border-gray-300'>Rate</th>
                                     <th className='py-2 px-4 border border-gray-300'>Discount (%)</th>
+                                    <th className='py-2 px-4 border border-gray-300'>HSN Code</th>
                                     <th className='py-2 px-4 border border-gray-300'>Total</th>
                                     <th className='py-2 px-4 border border-gray-300'>Action</th>
                                 </tr>
@@ -962,6 +989,7 @@ console.log("tumha",options)
                                                 }}
                                             />
                                         </td>
+                                        <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.total.toFixed(2)}</td>
                                         <td className='py-2 px-4 border border-gray-300'>
                                             <button 

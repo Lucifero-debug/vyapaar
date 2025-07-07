@@ -77,6 +77,8 @@ const freight = searchParams.get("freight");
 const weight = searchParams.get("weight");
 const ewayBillNo = searchParams.get("ewayBillNo");
 const ewayBillDate = searchParams.get("ewayBillDate");
+const orderNo=searchParams.get("orderNo")
+const orderDate=searchParams.get("orderDate")
 
 
 
@@ -89,13 +91,18 @@ const ewayBillDate = searchParams.get("ewayBillDate");
       >
         {/* Header */}
         <header className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-extrabold text-gray-800 tracking-wide">Prashant Enterprise</h1>
-            <p className="mt-1 text-sm text-gray-600">GSTIN: 12ABCDE3456F7Z8</p>
-            <p className="mt-1 text-gray-700 flex items-center gap-1">
-              <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 237742
-            </p>
-          </div>
+     <div className="flex items-center gap-4">
+    <div>
+      <h1 className="text-3xl font-extrabold text-gray-800 tracking-wide">Prashant Enterprise</h1>
+      <p className="mt-1 text-sm text-gray-600">GSTIN: 12ABCDE3456F7Z8</p>
+      <p className="mt-1 text-gray-700 flex items-center gap-1">
+        <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 237742
+      </p>
+    </div>
+      <div className="w-20 h-20 rounded-full overflow-hidden border border-gray-300 shadow-md flex-shrink-0">
+      <img src="https://yt3.googleusercontent.com/HxgiHavqWNI6ZLzqaiAI_mOiS6Cp0VKr-BarKsTR-9upQUcD8yv5k5J4rmPYQO8GhuhdscTT=s900-c-k-c0x00ffffff-no-rj" alt="Logo" className="w-full h-full object-cover" />
+    </div>
+  </div>
           <div className="text-right">
             <p className="text-sm text-gray-500">Invoice No:</p>
             <p className="font-semibold text-lg">{invoiceNo}</p>
@@ -139,9 +146,9 @@ const ewayBillDate = searchParams.get("ewayBillDate");
         </section>
 
         {/* Transport Details */}
-{(transport || grNo || grDate || pvtMark || caseDetails || freight || weight || ewayBillNo || ewayBillDate) && (
+{(transport || grNo || grDate || pvtMark || caseDetails || freight || weight || ewayBillNo || ewayBillDate || orderNo || orderDate) && (
   <section className="mb-6 border border-gray-300 rounded-md p-4 bg-gray-50">
-    <h3 className="text-md font-semibold text-gray-700 mb-3">Transport Details</h3>
+    <h3 className="text-md font-semibold text-gray-700 mb-3">Order Details</h3>
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-gray-700">
       {transport && (
         <div><span className="font-medium">Transport:</span> {transport}</div>
@@ -170,6 +177,12 @@ const ewayBillDate = searchParams.get("ewayBillDate");
       {ewayBillDate && (
         <div><span className="font-medium">E-Way Bill Date:</span> {ewayBillDate}</div>
       )}
+            {orderNo && (
+        <div><span className="font-medium">Order No:</span> {orderNo}</div>
+      )}
+            {orderDate && (
+        <div><span className="font-medium">Order Date:</span> {orderDate}</div>
+      )}
     </div>
   </section>
 )}
@@ -183,6 +196,7 @@ const ewayBillDate = searchParams.get("ewayBillDate");
               <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700">Quantity</th>
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Price (₹)</th>
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Discount (%)</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">HSN Code</th>
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Amount (₹)</th>
             </tr>
           </thead>
@@ -199,6 +213,7 @@ const ewayBillDate = searchParams.get("ewayBillDate");
           <td className="py-3 px-4 text-center">{item.quantity}</td>
           <td className="py-3 px-4 text-right">₹{item.cost.toFixed(2)}</td>
           <td className="py-3 px-4 text-right">{item.discount.toFixed(2)}%</td>
+          <td className="py-3 px-4 text-right">{item.hsn}</td>
           <td className="py-3 px-4 text-right font-semibold">₹{netAmount.toFixed(2)}</td>
         </tr>
         {item.description && (
