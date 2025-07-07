@@ -68,6 +68,15 @@ const PageContent = () => {
   const partyTaxes = JSON.parse(decodeURIComponent(searchParams.get('partyTaxes')));
   const shippedTo = searchParams.get("shippedTo");
 const dispatchFrom = searchParams.get("dispatchFrom");
+const transport = searchParams.get("transport");
+const grNo = searchParams.get("grNo");
+const grDate = searchParams.get("grDate");
+const pvtMark = searchParams.get("pvtMark");
+const caseDetails = searchParams.get("caseDetails");
+const freight = searchParams.get("freight");
+const weight = searchParams.get("weight");
+const ewayBillNo = searchParams.get("ewayBillNo");
+const ewayBillDate = searchParams.get("ewayBillDate");
 
 
 
@@ -128,6 +137,43 @@ const dispatchFrom = searchParams.get("dispatchFrom");
     )}
           </div>
         </section>
+
+        {/* Transport Details */}
+{(transport || grNo || grDate || pvtMark || caseDetails || freight || weight || ewayBillNo || ewayBillDate) && (
+  <section className="mb-6 border border-gray-300 rounded-md p-4 bg-gray-50">
+    <h3 className="text-md font-semibold text-gray-700 mb-3">Transport Details</h3>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-gray-700">
+      {transport && (
+        <div><span className="font-medium">Transport:</span> {transport}</div>
+      )}
+      {grNo && (
+        <div><span className="font-medium">GR No:</span> {grNo}</div>
+      )}
+      {grDate && (
+        <div><span className="font-medium">GR Date:</span> {grDate}</div>
+      )}
+      {pvtMark && (
+        <div><span className="font-medium">Pvt Mark:</span> {pvtMark}</div>
+      )}
+      {caseDetails && (
+        <div><span className="font-medium">Case:</span> {caseDetails}</div>
+      )}
+      {freight && (
+        <div><span className="font-medium">Freight:</span> ₹{parseFloat(freight).toFixed(2)}</div>
+      )}
+      {weight && (
+        <div><span className="font-medium">Weight:</span> {weight} kg</div>
+      )}
+      {ewayBillNo && (
+        <div><span className="font-medium">E-Way Bill No:</span> {ewayBillNo}</div>
+      )}
+      {ewayBillDate && (
+        <div><span className="font-medium">E-Way Bill Date:</span> {ewayBillDate}</div>
+      )}
+    </div>
+  </section>
+)}
+
 
         {/* Items Table */}
         <table className="w-full border-collapse mb-6">

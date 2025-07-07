@@ -48,6 +48,15 @@ const invoiceSchema = new mongoose.Schema(
     items: [itemSchema],
 
     partyTaxes: [partyTaxSchema],
+     transport: { type: String },         // Transport
+    grNo: { type: String },              // Gr No.
+    grDate: { type: Date },              // Date
+    pvtMark: { type: String },           // Pvt Mark
+    caseDetails: { type: String },       // Case
+    freight: { type: Number },           // Freight
+    weight: { type: Number },            // Weight
+    ewayBillNo: { type: String },        // E-Way No.
+    ewayBillDate: { type: Date },
     type:{ type: String, required: true },
     return:{type:Boolean,default:false}
   },

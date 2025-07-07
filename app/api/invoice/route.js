@@ -6,7 +6,6 @@ export async function POST(req){
     try {
         await connect()
         const invoicedata=await req.json(); 
-        console.log("achaa",invoicedata)
         const value=parseInt(invoicedata.value)
         const invoice= await Invoice.find({   
             $or: [

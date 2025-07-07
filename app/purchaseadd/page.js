@@ -15,7 +15,15 @@ const page = () => {
      const { options } = useSaleOptions();
      const [showShippedPopup, setShowShippedPopup] = useState(false);
 const [shippedTo, setShippedTo] = useState('');
-
+const [transport, setTransport] = useState('');
+const [grNo, setGrNo] = useState('');
+const [grDate, setGrDate] = useState('');
+const [pvtMark, setPvtMark] = useState('');
+const [caseDetails, setCaseDetails] = useState('');
+const [freight, setFreight] = useState('');
+const [weight, setWeight] = useState('');
+const [ewayBillNo, setEwayBillNo] = useState('');
+const [ewayBillDate, setEwayBillDate] = useState('');
 const [showDispatchPopup, setShowDispatchPopup] = useState(false);
 const [dispatchFrom, setDispatchFrom] = useState('');
 const [quantityPerPack, setQuantityPerPack] = useState(0);
@@ -107,6 +115,16 @@ useEffect(() => {
                 setDiscount(data.items?.discount || '');
                 setTaxType(data.taxType || 'local');
                 setPartyTaxes(data.partyTaxes || []);
+
+                    setTransport(data.transport || '');
+    setGrNo(data.grNo || '');
+    setGrDate(data.grDate ? formatDate(data.grDate) : '');
+    setPvtMark(data.pvtMark || '');
+    setCaseDetails(data.caseDetails || '');
+    setFreight(data.freight || '');
+    setWeight(data.weight || '');
+    setEwayBillNo(data.ewayBillNo || '');
+    setEwayBillDate(data.ewayBillDate ? formatDate(data.ewayBillDate) : '');
             })
             .catch(err => console.error('Error:', err));
         }
@@ -293,7 +311,16 @@ const addPartyTax = () => {
             partyTaxes: partyTaxes,
              shippedTo,
   dispatchFrom,
-            type: "Purchase"
+            type: "Purchase",
+              transport,
+  grNo,
+  grDate,
+  pvtMark,
+  caseDetails,
+  freight,
+  weight,
+  ewayBillNo,
+  ewayBillDate
         };
 
         try {
@@ -345,7 +372,16 @@ const addPartyTax = () => {
                     items: encodedItems,
                     partyTaxes:encodedParty,
                      shippedTo,
-  dispatchFrom
+  dispatchFrom,
+    transport,
+  grNo,
+  grDate,
+  pvtMark,
+  caseDetails,
+  freight,
+  weight,
+  ewayBillNo,
+  ewayBillDate
                 }).toString();
 
                 router.push(`/invoice?${query}`);
@@ -542,6 +578,91 @@ console.log("tumha",options)
                     />
                 </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-md">
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Transport</label>
+    <input
+      type="text"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={transport}
+      onChange={(e) => setTransport(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">GR No</label>
+    <input
+      type="text"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={grNo}
+      onChange={(e) => setGrNo(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">GR Date</label>
+    <input
+      type="date"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={grDate}
+      onChange={(e) => setGrDate(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Pvt Mark</label>
+    <input
+      type="text"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={pvtMark}
+      onChange={(e) => setPvtMark(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Case</label>
+    <input
+      type="text"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={caseDetails}
+      onChange={(e) => setCaseDetails(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Freight</label>
+    <input
+      type="number"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={freight}
+      onChange={(e) => setFreight(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">Weight (kg)</label>
+    <input
+      type="number"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={weight}
+      onChange={(e) => setWeight(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">E-Way Bill No</label>
+    <input
+      type="text"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={ewayBillNo}
+      onChange={(e) => setEwayBillNo(e.target.value)}
+    />
+  </div>
+  <div className="flex flex-col">
+    <label className="text-gray-600 font-medium mb-1">E-Way Bill Date</label>
+    <input
+      type="date"
+      className="h-10 px-3 border rounded-lg shadow-sm"
+      value={ewayBillDate}
+      onChange={(e) => setEwayBillDate(e.target.value)}
+    />
+  </div>
+</div>
+
 
             {/* Customer & Item Selection */}
             <div className='grid grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-md'>
