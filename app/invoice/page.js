@@ -209,7 +209,7 @@ const orderDate=searchParams.get("orderDate")
         <div><span className="font-medium">Case:</span> {caseDetails}</div>
       )}
       {freight && (
-        <div><span className="font-medium">Freight:</span> ₹{parseFloat(freight).toFixed(2)}</div>
+        <div><span className="font-medium">Freight:</span> {freight}</div>
       )}
       {weight && (
         <div><span className="font-medium">Weight:</span> {weight} kg</div>

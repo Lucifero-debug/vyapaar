@@ -7,11 +7,11 @@ export async function POST(req) {
     try {
         await connect()
         const invoiceData = await req.json();    
-        const invoiceId = invoiceData.id;
+        const invoiceId = invoiceData.invoiceNo;
         // Update the existing item based on the ID
-        console.log("horo",invoiceId)
+        console.log("horo",invoiceData)
         const updatedInvoice = await Invoice.findOneAndUpdate(
-            { _id: invoiceId }, // Filter to find the document to update
+            { invoiceNo: invoiceId }, // Filter to find the document to update
             {
                 invoiceNo: invoiceData.invoiceNo,
                  date: invoiceData.date,
@@ -29,8 +29,19 @@ export async function POST(req) {
             balanceDue: invoiceData.balanceDue,
             items: invoiceData.items,
             partyTaxes: invoiceData.partyTaxes || [],
+           weight: Number(invoiceData.weight) || 0,
+        transport: invoiceData.transport || '',
+        grNo: invoiceData.grNo || '',
+        grDate: invoiceData.grDate ? new Date(invoiceData.grDate) : null,
+        orderNo: Number(invoiceData.orderNo) || 0,
+        orderDate: invoiceData.orderDate ? new Date(invoiceData.orderDate) : null,
+        pvtMark: invoiceData.pvtMark || '',
+        caseDetails: invoiceData.caseDetails || '',
+        freight: invoiceData.freight || '',
+        ewayBillNo: invoiceData.ewayBillNo || '',
+        ewayBillDate: invoiceData.ewayBillDate ? new Date(invoiceData.ewayBillDate) : null,
             },
-            { new: true } // Return the updated document
+            { new: true }
         ).catch(err => {
             console.error("Update Error:", err);
             throw err;

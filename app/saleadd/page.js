@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 const page = () => {
     const router = useRouter()
    const [value, setValue] = useState('');
+   const [isValueReady,setIsValueReady]=useState(false)
      const { options } = useSaleOptions();
      const [showShippedPopup, setShowShippedPopup] = useState(false);
 const [shippedTo, setShippedTo] = useState('');
@@ -24,7 +25,7 @@ const [grDate, setGrDate] = useState('');
 const [pvtMark, setPvtMark] = useState('');
 const [caseDetails, setCaseDetails] = useState('');
 const [freight, setFreight] = useState('');
-const [weight, setWeight] = useState('');
+const [weight, setWeight] = useState(0);
 const [ewayBillNo, setEwayBillNo] = useState('');
 const [ewayBillDate, setEwayBillDate] = useState('');
 const [showDispatchPopup, setShowDispatchPopup] = useState(false);
@@ -72,7 +73,7 @@ const [noOfPack, setNoOfPack] = useState(0);
 
 useEffect(() => {
   const fetchInvoiceNo = async () => {
-    if (!value) { // Only fetch if not editing an existing invoice
+    if (!value&&isValueReady) { // Only fetch if not editing an existing invoice
       try {
         const response = await fetch('/api/next-invoice-no');
         const data = await response.json();
@@ -87,7 +88,7 @@ useEffect(() => {
   };
 
   fetchInvoiceNo();
-}, []);
+}, [value]);
 
     // Load existing invoice data if value parameter exists
     useEffect(() => {
@@ -149,70 +150,6 @@ setHsn(data.items?.hsn || '')
         }
     }, [customerLoaded, customer]);
 
-    // Save to localStorage whenever state changes (with debouncing for better performance)
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const timeoutId = setTimeout(() => {
-                saveToLocal('invoiceNo', invoiceNo);
-            }, 300);
-            return () => clearTimeout(timeoutId);
-        }
-    }, [invoiceNo]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('date', date);
-        }
-    }, [date]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('paymentType', paymentType);
-        }
-    }, [paymentType]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('stateOfSupply', stateOfSupply);
-        }
-    }, [stateOfSupply]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('taxType', taxType);
-        }
-    }, [taxType]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('selectedCustomer', selectedCustomer);
-        }
-    }, [selectedCustomer]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('partyTaxes', partyTaxes);
-        }
-    }, [partyTaxes]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('received', received);
-        }
-    }, [received]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('invoiceItems', selectedItem);
-        }
-    }, [selectedItem]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            saveToLocal('gst', gst);
-        }
-    }, [gst]);
-
 const addPartyTax = () => {
   if (!newTaxName || (!newTaxRate && !newTaxAmount)) {
     alert('Enter Tax Name and either Rate or Amount');
@@ -235,11 +172,9 @@ const addPartyTax = () => {
     total: taxTotal.toFixed(2),
   };
 
-  console.log('🧾 Adding Tax:', newTax);
 
   setPartyTaxes(prev => {
     const updated = [...prev, newTax];
-    console.log('✅ New Taxes:', updated);
     return updated;
   });
 
@@ -248,10 +183,6 @@ const addPartyTax = () => {
   setNewTaxAmount('');
 };
 
-
-    useEffect(() => {
-    console.log("partyTaxes changed:", partyTaxes);
-}, [partyTaxes]);
 
     // Handle remove item
     const handleRemove = (indexToRemove) => {
@@ -344,21 +275,6 @@ const addPartyTax = () => {
             const result = await response.json();
 
             if (result.success) {
-                console.log('Invoice saved:', result.invoice);
-                // Clear all localStorage data after successful save
-                if (typeof window !== 'undefined') {
-                    localStorage.removeItem('invoiceItems');
-                    localStorage.removeItem('invoiceNo');
-                    localStorage.removeItem('partyTaxes');
-                    localStorage.removeItem('date');
-                    localStorage.removeItem('gst');
-                    localStorage.removeItem('stateOfSupply');
-                    localStorage.removeItem('taxType');
-                    localStorage.removeItem('selectedCustomer');
-                    localStorage.removeItem('received');
-                    localStorage.removeItem('paymentType');
-                }
-
                 // Reset state
                 setSelectedItem([]);
                 setPartyTaxes([]);
@@ -550,21 +466,10 @@ useEffect(() => {
 };
 
 
-
-    // Clear localStorage on page unload
-    useEffect(() => {
-        const handleBeforeUnload = () => {
-            clearInvoiceDraft();
-        };
-        
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, []);
-
     return (
         <>
                     <Suspense fallback={null}>
-                <InvoiceSearchParams onValue={setValue} />
+                <InvoiceSearchParams onValue={setValue} onReady={setIsValueReady} />
               </Suspense>
         <div className='flex flex-col gap-6 p-6 bg-gray-50 min-h-screen'>
             {/* Invoice & Date */}
