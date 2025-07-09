@@ -36,9 +36,11 @@ import {
   PopoverTrigger,
 } from '../components/ui/popover';
 import ManIcon from '@mui/icons-material/Man';
+import HsnMaster from '@/components/HsnMaster';
 
 const Page = () => {
   const router = useRouter();
+  const [showHsnMaster, setShowHsnMaster] = useState(false);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [customer, setCustomer] = useState([]);
@@ -50,22 +52,27 @@ const Page = () => {
   const [alterState, setAlterState] = useState('');
   const [deleteState, setDeleteState] = useState('');
   const [item, setItem] = useState([]);
+  const [hsn, setHsn] = useState([]);
   const [alter, setAlter] = useState(false);
   const [del, setDel] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedHsn, setSelectedHsn] = useState(null);
+
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [itemRes, custRes, invRes] = await Promise.all([
+        const [itemRes, custRes, invRes,hsnRes] = await Promise.all([
           fetch('/api/get-item'),
           fetch('/api/get-customer'),
           fetch('/api/get-invoice'),
+          fetch('/api/get-hsn'),
         ]);
-        const [itemData, custData, invData] = await Promise.all([
+        const [itemData, custData, invData,hsnData] = await Promise.all([
           itemRes.json(),
           custRes.json(),
           invRes.json(),
+          hsnRes.json(),
         ]);
 
 
@@ -81,6 +88,12 @@ setItem(
   itemData.item.map(it => ({
     id: it._id, // 🔥 Add the real MongoDB ID
     name: it.name || it.itemName || it._id
+  })) || []
+);
+setHsn(
+  hsnData.hsn.map(hs => ({
+    ...hs,      
+    id: hs._id 
   })) || []
 );
 
@@ -128,7 +141,7 @@ setTotalSalesAmount(totalSales);
       console.log('Navigating with alterState:', alterState, 'value:', newValue);
       switch (alterState) {
         case 'Customer':
-          router.push(`/customeralter?value=${newValue}`);
+          router.push(`/customeradd?value=${newValue}`);
           break;
         case 'SaleInvoice':
           router.push(`/saleadd?value=${newValue}`);
@@ -143,8 +156,16 @@ setTotalSalesAmount(totalSales);
           router.push(`/purchasereturn?value=${newValue}`);
           break;
         case 'Item':
-          router.push(`/itemalter?value=${newValue}`);
+          router.push(`/itemadd?value=${newValue}`);
           break;
+case 'HSN':
+      const selected = hsn.find(h => h.hsncode === newValue);
+      if (selected) {
+        setSelectedHsn(selected);  
+        setShowHsnMaster(true);           // ✅ Open popup in edit mode
+      }
+      break;
+
         default:
           console.warn('Unsupported alterState:', alterState);
           alert(`Navigation not supported for ${alterState}`);
@@ -171,6 +192,10 @@ setTotalSalesAmount(totalSales);
     case 'PurchaseReturn':
       endpoint = `/api/delete-invoice?id=${currentValue}`;
       break;
+      case 'HSN':
+  endpoint = `/api/delete-hsn?id=${currentValue}`;
+  break;
+
     default:
       alert(`Delete not supported for ${alterState}`);
       return;
@@ -196,41 +221,29 @@ setTotalSalesAmount(totalSales);
 };
 
 
-  const getEntities = () => {
+    const getEntities = () => {
     switch (alterState) {
-      case 'Customer':
-        return customer;
-      case 'SaleInvoice':
-        return saleInvoices;
-      case 'PurchaseInvoice':
-        return purchaseInvoices;
-      case 'SaleReturn':
-        return saleReturns;
-      case 'PurchaseReturn':
-        return purchaseReturns;
-      case 'Item':
-        return item;
-      default:
-        return [];
+      case 'Customer': return customer;
+      case 'SaleInvoice': return saleInvoices;
+      case 'PurchaseInvoice': return purchaseInvoices;
+      case 'SaleReturn': return saleReturns;
+      case 'PurchaseReturn': return purchaseReturns;
+      case 'Item': return item;
+      case 'HSN': return hsn; // or return hsn;
+      default: return [];
     }
   };
 
-    const getEntitiey = () => {
+  const getEntitiey = () => {
     switch (deleteState) {
-      case 'Customer':
-        return customer;
-      case 'SaleInvoice':
-        return saleInvoices;
-      case 'PurchaseInvoice':
-        return purchaseInvoices;
-      case 'SaleReturn':
-        return saleReturns;
-      case 'PurchaseReturn':
-        return purchaseReturns;
-      case 'Item':
-        return item;
-      default:
-        return [];
+      case 'Customer': return customer;
+      case 'SaleInvoice': return saleInvoices;
+      case 'PurchaseInvoice': return purchaseInvoices;
+      case 'SaleReturn': return saleReturns;
+      case 'PurchaseReturn': return purchaseReturns;
+      case 'Item': return item;
+      case 'HSN': return hsn; // or return hsn;
+      default: return [];
     }
   };
 
@@ -471,6 +484,35 @@ setTotalSalesAmount(totalSales);
                 </DropdownMenuContent>
               </DropdownMenu>
             </AccordionContent>
+
+<AccordionContent className="bg-white px-4 py-3">
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="outline" className="w-full font-extrabold text-2xl">
+        HSN
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent className="w-56">
+      <DropdownMenuLabel>HSN Master</DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => setShowHsnMaster(true)}>
+          Create
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setAlterState('HSN') || setAlter(true)}>
+          Alter
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setDeleteState('HSN') || setDel(true)}>
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</AccordionContent>
+
+
+
+
           </AccordionItem>
         </Accordion>
 
@@ -482,143 +524,134 @@ setTotalSalesAmount(totalSales);
 </div>
 
 
-        {alter && (
-          <div className="mt-6 flex justify-center">
-            {loading ? (
-              <p>Loading data...</p>
-            ) : (
-              <Popover
-                open={open}
-                onOpenChange={(newOpen) => {
-                  console.log('Popover open state:', newOpen);
-                  setOpen(newOpen);
-                }}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-[250px] justify-between"
-                  >
-                    {value
-                      ? getEntities().find((entity) =>
-                          (alterState === 'Customer' || alterState === 'Item'
-                            ? entity.name
-                            : entity.invoiceNo) === value
-                        )?.[alterState === 'Customer' || alterState === 'Item' ? 'name' : 'invoiceNo'] || `Select ${alterState}`
-                      : `Select ${alterState}`}
-                    <ChevronsUpDown className="opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[250px] p-0">
-                  <Command>
-                    <CommandInput
-                      placeholder={`Search ${alterState}`}
-                      className="h-9"
-                      onValueChange={(value) => console.log('CommandInput value:', value)}
-                    />
-                    <CommandList>
-                      <CommandEmpty>No result found.</CommandEmpty>
-                      <CommandGroup>
-                        {getEntities().map((entity) => {
-                          const key = alterState === 'Customer' || alterState === 'Item' ? entity.name : entity.invoiceNo;
-                          return (
-                            <CommandItem
-                              key={key}
-                              value={String(key)}
-                              onSelect={(currentValue) => {
-                                handleSelect(currentValue);
-                              }}
-                            >
-                              {key}
-                              <Check
-                                className={cn(
-                                  'ml-auto',
-                                  value === key ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-        )}
-             {del && (
-          <div className="mt-6 flex justify-center">
-            {loading ? (
-              <p>Loading data...</p>
-            ) : (
-              <Popover
-                open={open}
-                onOpenChange={(newOpen) => {
-                  console.log('Popover open state:', newOpen);
-                  setOpen(newOpen);
-                }}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-[250px] justify-between"
-                  >
-                    {value
-                      ? getEntitiey().find((entity) =>
-                          (deleteState === 'Customer' || deleteState === 'Item'
-                            ? entity.name
-                            : entity.invoiceNo) === value
-                        )?.[deleteState === 'Customer' || deleteState === 'Item' ? 'name' : 'invoiceNo'] || `Select ${deleteState}`
-                      : `Select ${deleteState}`}
-                    <ChevronsUpDown className="opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[250px] p-0">
-                  <Command>
-                    <CommandInput
-                      placeholder={`Search ${deleteState}`}
-                      className="h-9"
-                      onValueChange={(value) => console.log('CommandInput value:', value)}
-                    />
-                    <CommandList>
-                      <CommandEmpty>No result found.</CommandEmpty>
-                      <CommandGroup>
-                        {getEntitiey().map((entity) => {
-                          const key = deleteState === 'Customer' || deleteState === 'Item' ? entity.name : entity.invoiceNo;
-                          const keys = deleteState === 'Customer' || deleteState === 'Item' ? entity.id : entity.invoiceNo;
-                          return (
-                            <CommandItem
-                              key={key}
-                              value={String(keys)}
-                              onSelect={(currentValue) => {
-                                handleDelete(currentValue);
-                              }}
-                            >
-                              {key}
-                              <Check
-                                className={cn(
-                                  'ml-auto',
-                                  value === key ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-        )}
+      {/* Alter Section */}
+      {alter && (
+        <div className="mt-6 flex justify-center">
+          {loading ? (
+            <p>Loading data...</p>
+          ) : (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[250px] justify-between">
+                  {value
+                    ? getEntities().find((e) =>
+                        (alterState === 'Customer' || alterState === 'Item'
+                          ? e.name
+                          : e.invoiceNo) === value
+                      )?.[alterState === 'Customer' || alterState === 'Item' ? 'name' : 'invoiceNo']
+                    : `Select ${alterState}`}
+                  <ChevronsUpDown className="opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[250px] p-0">
+                <Command>
+                  <CommandInput placeholder={`Search ${alterState}`} className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>No result found.</CommandEmpty>
+                    <CommandGroup>
+                      {getEntities().map((entity) => {
+                        const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: entity.invoiceNo;
+                        return (
+                          <CommandItem
+                            key={key}
+                            value={String(key)}
+                            onSelect={(currentValue) => handleSelect(currentValue)}
+                          >
+                            {key}
+                            <Check className={cn('ml-auto', value === key ? 'opacity-100' : 'opacity-0')} />
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+      )}
+
+
+      {/* Delete Section */}
+      {del && (
+        <div className="mt-6 flex justify-center">
+          {loading ? (
+            <p>Loading data...</p>
+          ) : (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+             <Button variant="outline" className="w-[250px] justify-between">
+  {value
+    ? getEntitiey().find((e) =>
+        deleteState === 'Customer' || deleteState === 'Item'
+          ? e.name === value
+          : deleteState === 'HSN'
+          ? e.hsncode === value
+          : e.invoiceNo === value
+      )?.[
+        deleteState === 'Customer' || deleteState === 'Item'
+          ? 'name'
+          : deleteState === 'HSN'
+          ? 'hsncode'
+          : 'invoiceNo'
+      ]
+    : `Select ${deleteState}`}
+  <ChevronsUpDown className="opacity-50" />
+</Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[250px] p-0">
+                <Command>
+                  <CommandInput placeholder={`Search ${deleteState}`} className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>No result found.</CommandEmpty>
+                   <CommandGroup>
+  {getEntitiey().map((entity) => {
+    let key, id;
+
+    if (deleteState === 'Customer' || deleteState === 'Item') {
+      key = entity.name;
+      id = entity.id;
+    } else if (deleteState === 'HSN') {
+      key = entity.hsncode;
+      id = entity.id;
+    } else {
+      key = entity.invoiceNo;
+      id = entity.invoiceNo;
+    }
+
+    return (
+      <CommandItem
+        key={id}
+        value={String(id)}
+        onSelect={() => handleDelete(id)}
+      >
+        {key}
+        <Check className={cn('ml-auto', value === key ? 'opacity-100' : 'opacity-0')} />
+      </CommandItem>
+    );
+  })}
+</CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+      )}
       </div>
+                 {showHsnMaster && (
+  <HsnMaster
+    open={showHsnMaster}
+    onClose={() => {
+      setShowHsnMaster(false);
+      setSelectedHsn(null); // reset
+    }}
+    selected={selectedHsn} // ✅ pass selected data
+  />
+)}
+
     </div>
+
   );
 };
 

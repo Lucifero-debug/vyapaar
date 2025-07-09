@@ -393,17 +393,23 @@ useEffect(() => {
   }
 
         if (selectedItems) {
-            const rateValue = rate || selectedItems.cost;
-            const quantityValue = quantity || 1;
+          const rateValue = rate || selectedItems.cost;
+  const quantityValue = quantity || 1;
 
-            const newItem = {
-                ...selectedItems,
-                quantity: quantityValue,
-                cost: rateValue || 2,
-                discount: discount || 0,
-                  hsn: selectedItems.hsn || '',
-                total: (rateValue * quantityValue) - ((rateValue * quantityValue) * (discount || 0) / 100),
-            };
+  const subtotal = rateValue * quantityValue;
+  const gstRate = selectedItems?.gst || 0;
+  const gstAmount = (subtotal * gstRate) / 100;
+  const total = subtotal + gstAmount;
+
+   const newItem = {
+    ...selectedItems,
+    quantity: quantityValue,
+    cost: rateValue,
+    discount: discount || 0,
+    gstRate,
+    gstAmount,
+    total:total,
+  };
 
             const updatedItems = [...selectedItem, newItem];
             setSelectedItem(updatedItems);
@@ -421,13 +427,20 @@ useEffect(() => {
   const rateValue = rate || selectedItems.cost;
   const quantityValue = quantity || 1;
 
+  const subtotal = rateValue * quantityValue;
+  const gstRate = selectedItems.hsn?.gst || 0;
+  const gstAmount = (subtotal * gstRate) / 100;
+  const total = subtotal + gstAmount;
+
   const newItem = {
     ...selectedItems,
     description: descriptionText,
     quantity: quantityValue,
     cost: rateValue,
     discount: discount || 0,
-    total: rateValue * quantityValue - (rateValue * quantityValue * (discount || 0)) / 100,
+    gstRate,
+    gstAmount,
+    total,
   };
 
   setSelectedItem([...selectedItem, newItem]);
@@ -446,7 +459,12 @@ useEffect(() => {
   if (!selectedItems) return;
 
   const rateValue = rate || selectedItems.cost;
-  const quantityValue = noOfPack*quantityPerPack;
+  const quantityValue = noOfPack * quantityPerPack;
+
+  const subtotal = rateValue * quantityValue;
+  const gstRate = selectedItems.hsn?.gst || 0;
+  const gstAmount = (subtotal * gstRate) / 100;
+  const total = subtotal + gstAmount;
 
   const newItem = {
     ...selectedItems,
@@ -454,7 +472,9 @@ useEffect(() => {
     quantity: quantityValue,
     cost: rateValue,
     discount: discount || 0,
-    total: rateValue * quantityValue - (rateValue * quantityValue * (discount || 0)) / 100,
+    gstRate,
+    gstAmount,
+    total:total,
   };
 
   setSelectedItem([...selectedItem, newItem]);
