@@ -2,64 +2,59 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import VoucherSearchParams from "@/components/VoucherSearchparams";
 
 const AddVoucher = () => {
 
-const searchParams = useSearchParams();
-const typeParam = searchParams.get("type");
-const value = searchParams.get("value"); 
+  const [voucherParams, setVoucherParams] = useState({ type: "", value: "" });
 
   const [form, setForm] = useState({
     acName: "",
     date: new Date().toISOString().slice(0, 10),
     againstBill: false,
-    acType: "", // Single acType at the top
+    acType: "",
   });
 
-  const [entries, setEntries] = useState([
-    { name: "", debit: "", credit: "" },
-  ]);
-
+  const [entries, setEntries] = useState([{ name: "", debit: "", credit: "" }]);
   const [customers, setCustomers] = useState([]);
 
   useEffect(() => {
-  if (value) {
-    const fetchVoucher = async () => {
-      try {
-        const res = await fetch("/api/voucher", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({  value }),
-        });
+    if (voucherParams.value) {
+      const fetchVoucher = async () => {
+        try {
+          const res = await fetch("/api/voucher", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: voucherParams.value }),
+          });
 
-        const result = await res.json();
-        const voucher = result.final;
-        if (!voucher) throw new Error("Voucher not found");
+          const result = await res.json();
+          const voucher = result.final;
+          if (!voucher) throw new Error("Voucher not found");
 
-        setForm({
-          acName: voucher?.acName || "",
-          date: voucher.date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-          againstBill: voucher.againstBill || false,
-          acType: voucher.acType || "",
-        });
+          setForm({
+            acName: voucher?.acName || "",
+            date: voucher.date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+            againstBill: voucher.againstBill || false,
+            acType: voucher.acType || "",
+          });
 
-        setEntries(
-          voucher.customers?.map((c) => ({
-            name: c.name || "",
-            debit: c.debit?.toString() || "",
-            credit: c.credit?.toString() || "",
-          })) || [{ name: "", debit: "", credit: "" }]
-        );
-      } catch (err) {
-        console.error("Failed to fetch voucher:", err);
-        alert("Failed to load voucher.");
-      }
-    };
+          setEntries(
+            voucher.customers?.map((c) => ({
+              name: c.name || "",
+              debit: c.debit?.toString() || "",
+              credit: c.credit?.toString() || "",
+            })) || [{ name: "", debit: "", credit: "" }]
+          );
+        } catch (err) {
+          console.error("Failed to fetch voucher:", err);
+          alert("Failed to load voucher.");
+        }
+      };
 
-    fetchVoucher();
-  }
-}, [value]);
-
+      fetchVoucher();
+    }
+  }, [voucherParams.value]);
 
   useEffect(() => {
     const fetchCust = async () => {
@@ -87,9 +82,7 @@ const value = searchParams.get("value");
   const handleEntryChange = (index, e) => {
     const { name, value } = e.target;
     setEntries((prev) =>
-      prev.map((entry, i) =>
-        i === index ? { ...entry, [name]: value } : entry
-      )
+      prev.map((entry, i) => (i === index ? { ...entry, [name]: value } : entry))
     );
   };
 
@@ -107,7 +100,7 @@ const value = searchParams.get("value");
     e.preventDefault();
 
     try {
-        const endpoint = value ? "/api/voucher-alter" : "/api/voucher-add";
+      const endpoint = voucherParams.value ? "/api/voucher-alter" : "/api/voucher-add";
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -116,13 +109,13 @@ const value = searchParams.get("value");
           date: form.date,
           againstBill: form.againstBill,
           acType: form.acType,
-          paymentType: typeParam,
+          paymentType: voucherParams.type,
           customers: entries.map((entry) => ({
             name: entry.name,
             debit: parseFloat(entry.debit) || 0,
             credit: parseFloat(entry.credit) || 0,
           })),
-           ...(value && { id: value }) 
+          ...(voucherParams.value && { id: voucherParams.value }),
         }),
       });
 
@@ -145,9 +138,10 @@ const value = searchParams.get("value");
 
   return (
     <div className="max-w-6xl mx-auto p-8 bg-white border shadow-md mt-12 font-mono text-gray-800 rounded-lg">
+        <VoucherSearchParams onParams={setVoucherParams} />
       <div className="flex justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">{typeParam=="Cash"?"Cash Voucher":"Bank Voucher"}</h1>
+          <h1 className="text-2xl font-bold">{voucherParams.type=="Cash"?"Cash Voucher":"Bank Voucher"}</h1>
           <p className="text-sm text-gray-600">Date: {form.date}</p>
         </div>
         <div className="text-right space-y-1">
@@ -244,7 +238,7 @@ const value = searchParams.get("value");
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
           <div>
   <label className="text-sm font-medium">
-    {typeParam === "Cash" ? "Cash A/c" : "Bank A/c"}
+    {voucherParams.type === "Cash" ? "Cash A/c" : "Bank A/c"}
   </label>
   <select
     name="acName"
@@ -254,11 +248,11 @@ const value = searchParams.get("value");
     className="w-full border px-3 py-1 rounded-md"
   >
     <option value="" disabled>
-      Select {typeParam === "Cash" ? "Cash" : "Bank"} Account
+      Select {voucherParams.type === "Cash" ? "Cash" : "Bank"} Account
     </option>
     {customers
       .filter((cust) =>
-        typeParam === "Cash"
+        voucherParams.type === "Cash"
           ? cust.group.toLowerCase() === "cash"
           : cust.group.toLowerCase() === "bank"
       )
