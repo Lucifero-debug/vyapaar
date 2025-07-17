@@ -122,6 +122,8 @@ const ewayBillNo = searchParams.get("ewayBillNo");
 const ewayBillDate = searchParams.get("ewayBillDate");
 const orderNo=searchParams.get("orderNo")
 const orderDate=searchParams.get("orderDate")
+const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(searchParams.get("hsnTotals"))) : {};
+
 
 
 
@@ -270,8 +272,32 @@ const orderDate=searchParams.get("orderDate")
     );
   })}
 </tbody>
-
         </table>
+
+        {Object.keys(hsnTotals).length > 0 && (
+          <section className="mt-10" style={{ breakInside: 'avoid' }}>
+            <h2 className="text-lg font-bold text-gray-800 mb-3 text-right border-b pb-1">HSN Code-wise Summary</h2>
+            <div className="flex justify-end">
+              <table className="text-sm border border-gray-300 w-full sm:w-[70%] md:w-[50%] lg:w-[40%]">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="py-2 px-4 text-left">HSN Code</th>
+                    <th className="py-2 px-4 text-right">Total Amount (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(hsnTotals).map(([hsn, total]) => (
+                    <tr key={hsn} className="border-b">
+                      <td className="py-2 px-4">{hsn}</td>
+                      <td className="py-2 px-4 text-right">₹{parseFloat(total).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
 {partyTaxes?.length > 0 && (
   <section className="max-w-xs ml-auto mt-4 text-right space-y-1">
     <h3 className="text-md font-semibold text-gray-700 mb-2">Additional Taxes:</h3>
@@ -284,20 +310,20 @@ const orderDate=searchParams.get("orderDate")
   </section>
 )}
 
-
         {/* Summary */}
-        <section className="max-w-xs ml-auto text-right space-y-1">
-          <p className="text-gray-700 text-lg font-semibold">Total: ₹{parseFloat(finalAmount).toFixed(2)}</p>
-          <p className="text-gray-600">Received: ₹{received.toFixed(2)}</p>
-          <p className="text-gray-600">Balance Due: ₹{balanceDue.toFixed(2)}</p>
-           {taxType === 'local' ? (
-              <>
-                <p>SGST: {(gstAmount/2).toFixed(2)}</p>
-                <p>CGST: {(gstAmount/2).toFixed(2)}</p>
-              </>
-            ) : (
-              <p>IGST: {gstAmount}</p>
-            )}
+           <section className="mt-10 max-w-sm ml-auto text-right" style={{ breakInside: 'avoid' }}>
+          <h2 className="text-md font-bold text-gray-800 mb-2 border-b pb-1">Invoice Summary</h2>
+          <p><strong>Total:</strong> ₹{finalAmount.toFixed(2)}</p>
+          <p><strong>Received:</strong> ₹{received.toFixed(2)}</p>
+          <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
+          {taxType === 'local' ? (
+            <>
+              <p><strong>SGST:</strong> ₹{(gstAmount / 2).toFixed(2)}</p>
+              <p><strong>CGST:</strong> ₹{(gstAmount / 2).toFixed(2)}</p>
+            </>
+          ) : (
+            <p><strong>IGST:</strong> ₹{gstAmount.toFixed(2)}</p>
+          )}
         </section>
 
         {/* Footer */}

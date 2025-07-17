@@ -37,6 +37,7 @@ import {
 } from '../components/ui/popover';
 import ManIcon from '@mui/icons-material/Man';
 import HsnMaster from '@/components/HsnMaster';
+import { set } from 'mongoose';
 
 const Page = () => {
   const router = useRouter();
@@ -53,6 +54,8 @@ const Page = () => {
   const [deleteState, setDeleteState] = useState('');
   const [item, setItem] = useState([]);
   const [hsn, setHsn] = useState([]);
+  const[bank,setBank]=useState([]);
+  const [cash,setCash]=useState([]);
   const [alter, setAlter] = useState(false);
   const [del, setDel] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,17 +65,19 @@ const Page = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [itemRes, custRes, invRes,hsnRes] = await Promise.all([
+        const [itemRes, custRes, invRes,hsnRes,voucherRes] = await Promise.all([
           fetch('/api/get-item'),
           fetch('/api/get-customer'),
           fetch('/api/get-invoice'),
           fetch('/api/get-hsn'),
+          fetch('/api/get-voucher'),
         ]);
-        const [itemData, custData, invData,hsnData] = await Promise.all([
+        const [itemData, custData, invData,hsnData,voucherData] = await Promise.all([
           itemRes.json(),
           custRes.json(),
           invRes.json(),
           hsnRes.json(),
+          voucherRes.json(),
         ]);
 
 
@@ -97,6 +102,21 @@ setHsn(
   })) || []
 );
 
+setBank(
+  voucherData.voucher.filter(v => v.paymentType === 'Bank').map(v => ({
+    id: v._id,
+    name: v.acName || v.accountName || v._id
+  })) || []
+);
+setCash(
+  voucherData.voucher.filter(v => v.paymentType === 'Cash').map(v => ({
+    id: v._id,
+    name: v.acName || v.accountName || v._id
+  })) || []
+);
+
+// console.log("Fetched Bank:", bank);
+console.log("Fetched Cash:", voucherData);
 
         // Categorize invoices
         const invoices = invData.invoice || [];
@@ -166,6 +186,19 @@ case 'HSN':
       }
       break;
 
+      case'Bank':
+          const selectedBank = bank.find(b => b.name === newValue);
+          if (selectedBank) {
+            router.push(`/voucheradd?type=Bank&value=${selectedBank.id}`);
+          }
+          break;
+      case'Cash':
+          const selectedCash = cash.find(c => c.name === newValue);
+          if (selectedCash) {
+            router.push(`/voucheradd?type=Cash&value=${selectedCash.id}`);
+          }
+          break;
+
         default:
           console.warn('Unsupported alterState:', alterState);
           alert(`Navigation not supported for ${alterState}`);
@@ -195,6 +228,12 @@ case 'HSN':
       case 'HSN':
   endpoint = `/api/delete-hsn?id=${currentValue}`;
   break;
+  case 'Bank':
+      endpoint = `/api/delete-voucher?id=${currentValue}&type=Bank`;
+      break;
+    case 'Cash':
+      endpoint = `/api/delete-voucher?id=${currentValue}&type=Cash`;
+      break;
 
     default:
       alert(`Delete not supported for ${alterState}`);
@@ -230,6 +269,8 @@ case 'HSN':
       case 'PurchaseReturn': return purchaseReturns;
       case 'Item': return item;
       case 'HSN': return hsn; // or return hsn;
+      case 'Bank': return bank;
+      case 'Cash': return cash;
       default: return [];
     }
   };
@@ -243,6 +284,8 @@ case 'HSN':
       case 'PurchaseReturn': return purchaseReturns;
       case 'Item': return item;
       case 'HSN': return hsn; // or return hsn;
+      case 'Bank': return bank;
+      case 'Cash': return cash;
       default: return [];
     }
   };
@@ -280,6 +323,7 @@ case 'HSN':
                     <DropdownMenuItem
                       onClick={() => {
                         console.log('Setting alterState to SaleInvoice');
+                        setDel(false);
                         setAlterState('SaleInvoice');
                         setAlter(true);
                       }}
@@ -288,6 +332,7 @@ case 'HSN':
                     </DropdownMenuItem>
                     <DropdownMenuItem
                      onClick={() => {
+                      setAlter (false);
                         setDeleteState('SaleInvoice');
                         setDel(true);
                       }}
@@ -314,6 +359,7 @@ case 'HSN':
                     <DropdownMenuItem
                       onClick={() => {
                         console.log('Setting alterState to SaleReturn');
+                        setDel(false);
                         setAlterState('SaleReturn');
                         setAlter(true);
                       }}
@@ -323,6 +369,7 @@ case 'HSN':
                     <DropdownMenuItem 
                       onClick={() => {
                         console.log('Setting deleteState to SaleReturn');
+                        setAlter(false);
                         setDeleteState('SaleReturn');
                         setDel(true);
                       }}
@@ -356,6 +403,7 @@ case 'HSN':
                     <DropdownMenuItem
                       onClick={() => {
                         console.log('Setting alterState to PurchaseInvoice');
+                        setDel(false);
                         setAlterState('PurchaseInvoice');
                         setAlter(true);
                       }}
@@ -365,6 +413,7 @@ case 'HSN':
                     <DropdownMenuItem
                      onClick={() => {
                         console.log('Setting deleteState to PurchaseInvoice');
+                        setAlter(false);
                         setDeleteState('PurchaseInvoice');
                         setDel(true);
                       }}
@@ -432,6 +481,7 @@ case 'HSN':
                     <DropdownMenuItem
                       onClick={() => {
                         console.log('Setting alterState to Customer');
+                      setDel(false);
                         setAlterState('Customer');
                         setAlter(true);
                       }}
@@ -441,6 +491,7 @@ case 'HSN':
                     <DropdownMenuItem
                     onClick={() => {
                         console.log('Setting deleteState to Customer');
+                        setAlter(false);
                         setDeleteState('Customer');
                         setDel(true);
                       }}
@@ -516,9 +567,99 @@ case 'HSN':
           </AccordionItem>
         </Accordion>
 
+             <Accordion type="single" collapsible>
+          <AccordionItem value="item-3">
+            <AccordionTrigger className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3">
+              <ManIcon /> Receive And Payments
+            </AccordionTrigger>
+            <AccordionContent className="bg-white px-4 py-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full font-extrabold text-2xl">
+                  Bank
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56">
+                  <DropdownMenuLabel>My Bank</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                   <DropdownMenuItem onClick={() => router.push('/voucheradd?type=Bank')}>
+                      Create
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        console.log('Setting alterState to Bank');
+                        console.log("fetched bank:", bank);
+                        setDel(false);
+                        setAlterState('Bank');
+                        setAlter(true);
+                      }}
+                    >
+                      Alter
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                    onClick={() => {
+                        console.log('Setting deleteState to Bank');
+                        setAlter(false);
+                        setDeleteState('Bank');
+                        setDel(true);
+                      }}
+                    >Delete</DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </AccordionContent>
+
+            <AccordionContent className="bg-white px-4 py-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full font-extrabold text-2xl">
+                    Cash
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56">
+                  <DropdownMenuLabel>My Cash</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+      <DropdownMenuItem onClick={() => router.push('/voucheradd?type=Cash')}>
+                      Create
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        console.log('Setting alterState to Cash');
+                        setDel(false);
+                        setAlterState('Cash');
+                        setAlter(true);
+                      }}
+                    >
+                      Alter
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                     onClick={() => {
+                        console.log('Setting deleteState to Cash');
+                        setAlter(false);
+                        setDeleteState('Cash');
+                        setDel(true);
+                      }}
+                    >Delete</DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
         <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/voucher')}>
   🧾 Voucher
 </div>
+
+        <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/ledger')}>
+  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 32 32" id="ledger">
+  <path fill="#212121" d="M12 8C11.4477 8 11 8.44772 11 9V11C11 11.5523 11.4477 12 12 12H20C20.5523 12 21 11.5523 21 11V9C21 8.44772 20.5523 8 20 8H12Z"></path>
+  <path fill="#212121" d="M4 3C4 1.89543 4.89543 1 6 1H27C28.1046 1 29 1.89543 29 3V28C29 29.1046 28.1046 30 27 30H6C4.89543 30 4 29.1046 4 28V24.7391C3.09792 24.1616 2.5 23.1506 2.5 22C2.5 20.9218 3.02505 19.9662 3.83341 19.375C3.02505 18.7838 2.5 17.8282 2.5 16.75C2.5 15.6718 3.02505 14.7162 3.83341 14.125C3.02505 13.5338 2.5 12.5782 2.5 11.5C2.5 10.4218 3.02505 9.46622 3.83341 8.875C3.02505 8.28378 2.5 7.32821 2.5 6.25C2.5 5.0994 3.09792 4.08844 4 3.51091V3ZM6 20.2677V25H27V3L6 3V3.00947C6.22342 3.02647 6.44053 3.06606 6.64905 3.12595C6.85055 3.10147 7.19353 3.26251 7.55891 3.54953C8.36306 4.08926 8.91283 4.97865 8.99053 6H9C9 6.09849 8.9806 6.19602 8.94291 6.28701C8.90522 6.37801 8.84997 6.46069 8.78033 6.53033C8.71069 6.59997 8.62801 6.65522 8.53701 6.69291C8.44602 6.7306 8.34849 6.75 8.25 6.75C8.15151 6.75 8.05398 6.7306 7.96299 6.69291C7.87199 6.65522 7.78931 6.59997 7.71967 6.53033C7.65003 6.46069 7.59478 6.37801 7.55709 6.28701C7.5194 6.19602 7.5 6.09849 7.5 6H7.48228C7.37265 5.23358 6.76642 4.62735 6 4.51772V8.25947C6.22342 8.27647 6.44053 8.31606 6.64905 8.37595C6.85055 8.35147 7.19353 8.51251 7.55891 8.79953C8.36306 9.33926 8.91283 10.2286 8.99053 11.25H9C9 11.3485 8.9806 11.446 8.94291 11.537C8.90522 11.628 8.84997 11.7107 8.78033 11.7803C8.71069 11.85 8.62801 11.9052 8.53701 11.9429C8.44602 11.9806 8.34849 12 8.25 12C8.15151 12 8.05398 11.9806 7.96299 11.9429C7.87199 11.9052 7.78931 11.85 7.71967 11.7803C7.65003 11.7107 7.59478 11.628 7.55709 11.537C7.5194 11.446 7.5 11.3485 7.5 11.25H7.48228C7.37265 10.4836 6.76642 9.87735 6 9.76772V13.5095C6.22342 13.5265 6.44053 13.5661 6.64905 13.626C6.85055 13.6015 7.19353 13.7625 7.55891 14.0495C8.36306 14.5893 8.91283 15.4786 8.99053 16.5H9C9 16.5985 8.9806 16.696 8.94291 16.787C8.90522 16.878 8.84997 16.9607 8.78033 17.0303C8.71069 17.1 8.62801 17.1552 8.53701 17.1929C8.44602 17.2306 8.34849 17.25 8.25 17.25C8.15151 17.25 8.05398 17.2306 7.96299 17.1929C7.87199 17.1552 7.78931 17.1 7.71967 17.0303C7.65003 16.9607 7.59478 16.878 7.55709 16.787C7.5194 16.696 7.5 16.5985 7.5 16.5H7.48228C7.37265 15.7336 6.76642 15.1273 6 15.0177V18.7595C6.22342 18.7765 6.44053 18.8161 6.64905 18.876C6.85055 18.8515 7.19353 19.0125 7.55891 19.2995C8.36306 19.8393 8.91283 20.7286 8.99053 21.75H9C9 21.8485 8.9806 21.946 8.94291 22.037C8.90522 22.128 8.84997 22.2107 8.78033 22.2803C8.71069 22.35 8.62801 22.4052 8.53701 22.4429C8.44602 22.4806 8.34849 22.5 8.25 22.5C8.15151 22.5 8.05398 22.4806 7.96299 22.4429C7.87199 22.4052 7.78931 22.35 7.71967 22.2803C7.65003 22.2107 7.59478 22.128 7.55709 22.037C7.5194 21.946 7.5 21.8485 7.5 21.75H7.48228C7.37265 20.9836 6.76642 20.3774 6 20.2677ZM6 27L6 28H27V27H6Z"></path>
+</svg> Ledger
+</div>
+
         <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/setup')}>
 <SettingsApplicationsIcon/>  Setup
 </div>
@@ -550,7 +691,7 @@ case 'HSN':
                     <CommandEmpty>No result found.</CommandEmpty>
                     <CommandGroup>
                       {getEntities().map((entity) => {
-                        const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: entity.invoiceNo;
+                        const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: alterState === 'Bank' || alterState=='Cash'?entity.name: entity.invoiceNo;
                         return (
                           <CommandItem
                             key={key}
@@ -587,12 +728,16 @@ case 'HSN':
           ? e.name === value
           : deleteState === 'HSN'
           ? e.hsncode === value
+          : deleteState === 'Bank' || deleteState === 'Cash'
+          ? e.acName === value
           : e.invoiceNo === value
       )?.[
         deleteState === 'Customer' || deleteState === 'Item'
           ? 'name'
           : deleteState === 'HSN'
           ? 'hsncode'
+          : deleteState === 'Bank' || deleteState === 'Cash'
+          ? 'acName'
           : 'invoiceNo'
       ]
     : `Select ${deleteState}`}
@@ -606,18 +751,30 @@ case 'HSN':
                     <CommandEmpty>No result found.</CommandEmpty>
                    <CommandGroup>
   {getEntitiey().map((entity) => {
-    let key, id;
+   let key, id;
 
-    if (deleteState === 'Customer' || deleteState === 'Item') {
-      key = entity.name;
-      id = entity.id;
-    } else if (deleteState === 'HSN') {
-      key = entity.hsncode;
-      id = entity.id;
-    } else {
-      key = entity.invoiceNo;
-      id = entity.invoiceNo;
-    }
+if (
+  deleteState === 'Customer' ||
+  deleteState === 'Item'
+) {
+  key = entity.name;
+  id = entity.id;
+} else if (deleteState === 'HSN') {
+  key = entity.hsncode;
+  id = entity.id;
+}else if (
+  deleteState === 'Bank' ||
+  deleteState === 'Cash'
+) {
+  key = entity.name;
+  id = entity.id;
+}
+
+else {
+  key = entity.invoiceNo;
+  id = entity.invoiceNo;
+}
+
 
     return (
       <CommandItem

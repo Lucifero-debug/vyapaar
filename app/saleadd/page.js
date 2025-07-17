@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 const page = () => {
     const router = useRouter()
    const [value, setValue] = useState('');
+   const [hsnTotals, setHsnTotals] = useState({});
    const [isValueReady,setIsValueReady]=useState(false)
      const { options } = useSaleOptions();
      const [showShippedPopup, setShowShippedPopup] = useState(false);
@@ -101,7 +102,6 @@ useEffect(() => {
             .then(res => res.json())
             .then(res => {
                 const data = res.final;
-                console.log("maahiya",data)
                 setInvoiceNo(data.invoiceNo || 4);
                 setDate(data.date ? formatDate(data.date) : new Date().toISOString().substring(0, 10));
                 setId(data._id);
@@ -190,6 +190,14 @@ const addPartyTax = () => {
         setSelectedItem(updatedItems);
         const newTotal = updatedItems.reduce((acc, curr) => acc + curr.total, 0);
         setTotalAmount(newTotal.toFixed(2));
+
+        // Recalculate HSN Totals
+const groupedByHSN = {};
+updatedItems.forEach(item => {
+  const hsn = item.hsn || 'N/A';
+  groupedByHSN[hsn] = (groupedByHSN[hsn] || 0) + item.total;
+});
+setHsnTotals(groupedByHSN);
     }
 
     // Fetch items and customers
@@ -225,6 +233,7 @@ const addPartyTax = () => {
     const submitInvoice = async () => {
         const encodedItems = encodeURIComponent(JSON.stringify(selectedItem));
         const encodedParty = encodeURIComponent(JSON.stringify(partyTaxes));
+       const encodedHsnTotals = encodeURIComponent(JSON.stringify(hsnTotals));
         const phone = selectedCustomer.phone;
 
         const invoiceData = {
@@ -235,14 +244,15 @@ const addPartyTax = () => {
                 phone: phone,
                 email: selectedCustomer.email,
             },
+return: false, 
             paymentType,
+            balanceDue,
             stateOfSupply,
             taxType,
             gst,
             gstAmount: Number(gstAmount),
             totalAmount: Number(totalAmount),
             finalAmount: Number(finalAmount),
-            balanceDue,
             received: Number(received) || 0,
             items: selectedItem,
             partyTaxes: partyTaxes,
@@ -307,7 +317,8 @@ const addPartyTax = () => {
   ewayBillNo,
   ewayBillDate,
   orderNo,
-  orderDate
+  orderDate,
+  hsnTotals:encodedHsnTotals
                 }).toString();
 
                 router.push(`/invoice?${query}`);
@@ -413,6 +424,12 @@ useEffect(() => {
 
             const updatedItems = [...selectedItem, newItem];
             setSelectedItem(updatedItems);
+            const groupedByHSN = {};
+updatedItems.forEach(item => {
+  const hsn = item.hsn || 'N/A';
+  groupedByHSN[hsn] = (groupedByHSN[hsn] || 0) + item.total;
+});
+setHsnTotals(groupedByHSN);
         }
 
         setItemName('');
@@ -444,6 +461,12 @@ useEffect(() => {
   };
 
   setSelectedItem([...selectedItem, newItem]);
+  const groupedByHSN = {};
+updatedItems.forEach(item => {
+  const hsn = item.hsn || 'N/A';
+  groupedByHSN[hsn] = (groupedByHSN[hsn] || 0) + item.total;
+});
+setHsnTotals(groupedByHSN);
 
   // Reset all
   setShowDescPopup(false);
@@ -478,6 +501,12 @@ useEffect(() => {
   };
 
   setSelectedItem([...selectedItem, newItem]);
+  const groupedByHSN = {};
+updatedItems.forEach(item => {
+  const hsn = item.hsn || 'N/A';
+  groupedByHSN[hsn] = (groupedByHSN[hsn] || 0) + item.total;
+});
+setHsnTotals(groupedByHSN);
 
   // Reset all
   setShowQuantityPack(false);
@@ -935,6 +964,28 @@ useEffect(() => {
                     <h1 className='text-gray-500'>No Items Selected</h1>
                 )}
             </div>
+<div className='mt-6'>
+  <h2 className='font-bold text-xl mb-2'>HSN Code-wise Totals</h2>
+  <div className='border border-gray-300 rounded-md overflow-hidden'>
+    <table className='w-full text-left border-collapse'>
+      <thead className='bg-gray-100'>
+        <tr>
+          <th className='py-2 px-4 border-b border-gray-300'>HSN Code</th>
+          <th className='py-2 px-4 border-b border-gray-300'>Total Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(hsnTotals).map(([hsn, total]) => (
+          <tr key={hsn} className='hover:bg-gray-50'>
+            <td className='py-2 px-4 border-b border-gray-200'>{hsn}</td>
+            <td className='py-2 px-4 border-b border-gray-200'>₹{total.toFixed(2)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 
             {/* Party Taxes Section */}
             <div className='flex flex-col gap-3 mt-6'>

@@ -13,7 +13,6 @@ const itemSchema = new mongoose.Schema({
     },
    group:{
     type:String,
-    required:[true,"Please provide a group"],
    }, 
    mrp:{
     type:Number,
