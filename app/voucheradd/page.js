@@ -1,7 +1,6 @@
 "use client";
 
 import React, { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import VoucherSearchParams from "@/components/VoucherSearchparams";
 
 const AddVoucher = () => {
@@ -142,7 +141,6 @@ const AddVoucher = () => {
                          <VoucherSearchParams onParams={setVoucherParams} />
                   </Suspense>
     <div className="max-w-6xl mx-auto p-8 bg-white border shadow-md mt-12 font-mono text-gray-800 rounded-lg">
-        <VoucherSearchParams onParams={setVoucherParams} />
       <div className="flex justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">{voucherParams.type=="Cash"?"Cash Voucher":"Bank Voucher"}</h1>
