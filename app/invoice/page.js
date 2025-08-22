@@ -28,8 +28,9 @@ const generatePDF = async (contentRef) => {
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
 
+    const scaleFactor = 0.7;
     const imgRatio = canvasHeight / canvasWidth;
-    const imgPDFHeight = pdfWidth * imgRatio;
+    const imgPDFHeight = pdfWidth * imgRatio * scaleFactor;
 
     let heightLeft = imgPDFHeight;
     let position = 0;
@@ -141,7 +142,7 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
       <h1 className="text-3xl font-extrabold text-gray-800 tracking-wide">Prashant Enterprise</h1>
       <p className="mt-1 text-sm text-gray-600">GSTIN: 12ABCDE3456F7Z8</p>
       <p className="mt-1 text-gray-700 flex items-center gap-1">
-        <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 237742
+        <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 23774
       </p>
     </div>
       <div className="w-20 h-20 rounded-full overflow-hidden border border-gray-300 shadow-md flex-shrink-0">
@@ -175,11 +176,11 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
             <p className="mt-1">Tax Type: {taxType}</p>
             {taxType === 'local' ? (
               <>
-                <p>SGST: {(gst/2).toFixed(2)}%</p>
-                <p>CGST: {(gst/2).toFixed(2)}%</p>
+                <p>SGST: {(gst/2).toFixed(2)}</p>
+                <p>CGST: {(gst/2).toFixed(2)}</p>
               </>
             ) : (
-              <p>IGST: {gst}%</p>
+              <p>IGST: {gst}</p>
             )}
                {dispatchFrom && (
       <>
@@ -242,14 +243,12 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Price (₹)</th>
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Discount (%)</th>
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">HSN Code</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">GST</th>
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Amount (₹)</th>
             </tr>
           </thead>
     <tbody>
   {items.map((item, i) => {
-    const grossAmount = item.quantity * item.cost;
-    const discountAmount = grossAmount * (item.discount / 100);
-    const netAmount = grossAmount - discountAmount;
 
     return (
       <React.Fragment key={i}>
@@ -259,7 +258,8 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
           <td className="py-3 px-4 text-right">₹{item.cost.toFixed(2)}</td>
           <td className="py-3 px-4 text-right">{item.discount.toFixed(2)}%</td>
           <td className="py-3 px-4 text-right">{item.hsn}</td>
-          <td className="py-3 px-4 text-right font-semibold">₹{netAmount.toFixed(2)}</td>
+          <td className="py-3 px-4 text-right">{item.gst}%</td>
+          <td className="py-3 px-4 text-right font-semibold">₹{item.total.toFixed(2)}</td>
         </tr>
         {item.description && (
           <tr className="border-b border-gray-200 bg-gray-50">
@@ -276,8 +276,8 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
 
         {Object.keys(hsnTotals).length > 0 && (
           <section className="mt-10" style={{ breakInside: 'avoid' }}>
-            <h2 className="text-lg font-bold text-gray-800 mb-3 text-right border-b pb-1">HSN Code-wise Summary</h2>
-            <div className="flex justify-end">
+            <h2 className="text-lg font-bold text-gray-800 mb-3 border-b pb-1">HSN Code-wise Summary</h2>
+            <div className="flex justify-start">
               <table className="text-sm border border-gray-300 w-full sm:w-[70%] md:w-[50%] lg:w-[40%]">
                 <thead className="bg-gray-100">
                   <tr>
@@ -318,11 +318,11 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
           <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
           {taxType === 'local' ? (
             <>
-              <p><strong>SGST:</strong> ₹{(gstAmount / 2).toFixed(2)}</p>
-              <p><strong>CGST:</strong> ₹{(gstAmount / 2).toFixed(2)}</p>
+              <p><strong>SGST:</strong> ₹{(gst / 2).toFixed(2)}</p>
+              <p><strong>CGST:</strong> ₹{(gst / 2).toFixed(2)}</p>
             </>
           ) : (
-            <p><strong>IGST:</strong> ₹{gstAmount.toFixed(2)}</p>
+            <p><strong>IGST:</strong> ₹{gst.toFixed(2)}</p>
           )}
         </section>
 

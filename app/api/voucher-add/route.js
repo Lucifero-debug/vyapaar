@@ -1,83 +1,50 @@
-import { NextResponse } from 'next/server';
-import {connect} from '../../../lib/mongodb'
+import { connect } from '../../../lib/mongodb';
 import Voucher from '../../../models/voucherModel';
-import Ledger from '../../../models/ledgerModel';
-import Customer from '../../../models/custModel';
 
+export const GET = async () => {
+  await connect();
 
-export async function POST(req) {
-  try {
-    await connect();
+  const vouchers = await Voucher.find().sort({ date: 1 });
 
-    const body = await req.json();
+  const ledgerMap = {};
 
-    const {
-      acName,
-      date,
-      customers,
-      againstBill,
-      acType,
-      paymentType
-    } = body;
+  for (const v of vouchers) {
+    const { date, acName, customers, paymentType } = v;
 
-    if (!acName || !Array.isArray(customers) || customers.length === 0) {
-      return NextResponse.json({ message: "Missing required fields." }, { status: 400 });
-    }
-    console.log("Received data:",req.body)
+    // Add entry for the main account (cash or bank)
+    if (!ledgerMap[acName]) ledgerMap[acName] = [];
 
-    const newVoucher = await Voucher.create({
-      acName,
-      date,
-      customers,
-      againstBill,
-      acType,
-      paymentType
-    });
- let totalAmount = 0;
+    for (const c of customers) {
+      const debit = c.debit || 0;
+      const credit = c.credit || 0;
 
-    for (const entry of customers) {
-      const { name, debit = 0, credit = 0 } = entry;
-  const amount = debit || credit;
-  totalAmount += amount;
+      // Add entry for each customer
+      if (!ledgerMap[c.name]) ledgerMap[c.name] = [];
 
-      // Ledger for customer (credited)
-      await Ledger.create({
+      ledgerMap[c.name].push({
         date,
-        account: name,
-        type: 'customer',
-        debit: 0,
-        credit: amount,
-        narration: `Voucher entry via ${acName}`,
-        voucherId: newVoucher._id
-      });
-
-      // Ledger for cash/bank (debited)
-      await Ledger.create({
-        date,
+        type: paymentType,   // cash or bank
         account: acName,
-        type: acType,
-        debit: amount,
-        credit: 0,
-        narration: `Voucher entry for ${name}`,
-        voucherId: newVoucher._id
+        debit,
+        credit,
       });
-
-    // Update customer balance (reduce since payment received)
-      await Customer.findOneAndUpdate(
-        { name },
-        { $inc: { lastBal: +amount } }
-      );
     }
 
-    // Update payer (acName) balance (increase since amount is paid out)
-    await Customer.findOneAndUpdate(
-      { name: acName },
-      { $inc: { lastBal: -totalAmount } }
-    );
-
-    return NextResponse.json({ message: 'Voucher created successfully', voucher: newVoucher }, { status: 201 });
-  } catch (error) {
-    console.error('[VOUCHER_POST_ERROR]', error);
-    return NextResponse.json({ message: 'Internal Server Error', error: error.message }, { status: 500 });
+    // <-- Removed reverse entry code here -->
   }
-}
+
+  // Calculate running balance for each account
+  const finalLedger = {};
+  for (const [accountName, entries] of Object.entries(ledgerMap)) {
+    let balance = 0;
+    finalLedger[accountName] = entries.map((entry) => {
+      balance += entry.debit - entry.credit;
+      return {
+        ...entry,
+        balance,
+      };
+    });
+  }
+
+  return Response.json(finalLedger);
+};

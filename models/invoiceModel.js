@@ -28,13 +28,16 @@ const invoiceSchema = new mongoose.Schema(
       phone: { type: String },
       email: { type: String },
     },
-
+    hsnTotals: [
+  {
+    hsn: { type: String, required: true },
+    amount: { type: Number, required: true },
+  }
+],
     paymentType: { type: String, required: true },  // e.g. Cash / Cheque
     stateOfSupply: { type: String, required: true }, // e.g. Delhi
     taxType: { type: String, required: true },  // local / central
     gst: { type: Number, required: true },
-
-    gstAmount: { type: Number, required: true },
     totalAmount: { type: Number, required: true },
     finalAmount: { type: Number, required: true },
     received: { type: Number, required: true },
