@@ -100,6 +100,7 @@ const AddVoucher = () => {
 
     try {
       const endpoint = voucherParams.value ? "/api/voucher-alter" : "/api/voucher-add";
+      console.log("first")
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -117,6 +118,7 @@ const AddVoucher = () => {
           ...(voucherParams.value && { id: voucherParams.value }),
         }),
       });
+      console.log("second",res)
 
       if (!res.ok) throw new Error("Failed to create voucher");
 

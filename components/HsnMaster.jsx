@@ -77,7 +77,7 @@ const HsnMaster = ({ open, onClose, selected }) => {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Group</label>
+            <label className="block text-sm text-gray-600 mb-1">HSN Name</label>
             <Input
               placeholder="Enter Group"
               value={hsnForm.hsnname}
@@ -98,9 +98,9 @@ const HsnMaster = ({ open, onClose, selected }) => {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Item Type</label>
+            <label className="block text-sm text-gray-600 mb-1">GST Unit</label>
             <Input
-              placeholder="Enter Item Type"
+              placeholder="Enter Gst Unit"
               value={hsnForm.gstunit}
               onChange={(e) =>
                 setHsnForm({ ...hsnForm, gstunit: e.target.value })

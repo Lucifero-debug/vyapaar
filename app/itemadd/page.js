@@ -128,92 +128,139 @@ const PageContent = () => {
   };
 
   return (
-    <div className='w-full h-full flex items-center justify-center'>
-      <Tabs defaultValue='account' className='w-[400px]'>
-        <TabsList className='grid w-full grid-cols-2'>
-          <TabsTrigger value='account'>Standard</TabsTrigger>
-          <TabsTrigger value='password'>Advance</TabsTrigger>
+    <div className="w-full flex justify-center items-start py-6">
+      <Tabs defaultValue="account" className="flex flex-col md:flex-row w-[95vw] md:w-[80vw]">
+        {/* LEFT SIDE (Tabs List) */}
+        <TabsList
+          className="
+            flex 
+            md:flex-col 
+            justify-start 
+            md:w-[200px] 
+            w-full 
+            overflow-x-auto 
+            h-28
+            border-b md:border-b-0 md:border-r 
+            border-gray-300 
+            rounded-none 
+            bg-white
+          "
+        >
+          <TabsTrigger
+            value="account"
+            className="
+              flex-1 
+              md:w-full 
+              justify-center md:justify-start 
+              px-4 py-3 
+              text-sm 
+              whitespace-nowrap
+              rounded-none 
+              data-[state=active]:bg-blue-100 
+              data-[state=active]:text-blue-600
+            "
+          >
+            Standard
+          </TabsTrigger>
+          <TabsTrigger
+            value="password"
+            className="
+              flex-1 
+              md:w-full 
+              justify-center md:justify-start 
+              px-4 py-3 
+              text-sm 
+              whitespace-nowrap
+              rounded-none 
+              data-[state=active]:bg-blue-100 
+              data-[state=active]:text-blue-600
+            "
+          >
+            Advance
+          </TabsTrigger>
         </TabsList>
 
-        {/* Advance */}
-        <TabsContent value='password'>
-          <Card>
-            <CardHeader>
-              <CardTitle>Advance</CardTitle>
-              <CardDescription>Financial details of the item.</CardDescription>
-            </CardHeader>
-            <CardContent className='space-y-2'>
-              <div className='grid grid-cols-2 gap-2'>
-                <div className='space-y-1'>
-                  <Label>Opening Balance</Label>
-                  <Input type='number' onChange={e => setOpenBal(+e.target.value || 0)} value={openBal} />
-                </div>
-                <div className='space-y-1'>
-                  <Label>Dr/Cr</Label>
-                  <Input type='number' />
-                </div>
-                <div className='space-y-1'>
-                  <Label>Last Year Balance</Label>
-                  <Input type='number' onChange={e => setLastBal(+e.target.value || 0)} value={lastBal} />
-                </div>
-                <div className='space-y-1'>
-                  <Label>Dr/Cr</Label>
-                  <Input type='number' />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button>Next</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
+        {/* RIGHT SIDE (Tab Content) */}
+        <div className="flex-1 p-3 md:p-5 overflow-auto">
+          {/* Standard */}
+          <TabsContent value="account" className="h-full">
+            <Card className="border-2 border-gray-200">
+              <CardHeader>
+                <CardTitle>Standard</CardTitle>
+                <CardDescription>Basic details of the item.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <InputField label="Name" value={name} onChange={setName} />
+                  <InputField label="Short Name" value={short} onChange={setShort} />
+                  <InputField label="Group" value={group} onChange={setGroup} />
 
-        {/* Standard */}
-        <TabsContent value='account'>
-          <Card className='w-[60vw] border-4 border-black -translate-x-10'>
-            <CardHeader>
-              <CardTitle>Standard</CardTitle>
-              <CardDescription>Basic details of the item.</CardDescription>
-            </CardHeader>
-            <CardContent className='space-y-2'>
-              <div className='grid grid-cols-3 gap-3'>
-                <InputField label="Name" value={name} onChange={setName} />
-                <InputField label="Cost Price" type="number" value={cost} onChange={setCost} />
-                <InputField label="Short Name" value={short} onChange={setShort} />
-                <InputField label="Group" value={group} onChange={setGroup} />
-                <div className='space-y-1'>
-                  <Label htmlFor="hsn">HSN Code</Label>
-                  <select
-                    id="hsn"
-                    className="w-full border border-gray-300 rounded px-2 py-2"
-                    value={hsn}
-                    onChange={(e) => {
-                      const selectedHsn = hsnList.find(h => h.hsncode === e.target.value);
-                      setHsn(selectedHsn?.hsncode || '');
-                      setGst(selectedHsn?.gst || 0);
-                    }}
-                  >
-                    <option value="">Select HSN</option>
-                    {hsnList.map((item) => (
-                      <option key={item._id} value={item.hsncode}>{item.hsncode}</option>
-                    ))}
-                  </select>
+                  <div className="space-y-1">
+                    <Label htmlFor="hsn">HSN Code</Label>
+                    <select
+                      id="hsn"
+                      className="w-full border border-gray-300 rounded px-2 py-2"
+                      value={hsn}
+                      onChange={(e) => {
+                        const selectedHsn = hsnList.find(h => h.hsncode === e.target.value);
+                        setHsn(selectedHsn?.hsncode || '');
+                        setGst(selectedHsn?.gst || 0);
+                      }}
+                    >
+                      <option value="">Select HSN</option>
+                      {hsnList.map((item) => (
+                        <option key={item._id} value={item.hsncode}>{item.hsncode}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <InputField label="Unit" value={unit} onChange={setUnit} />
+                  <InputField label="Sale Price" type="number" value={salePrice} onChange={setSalePrice} />
+                  <InputField label="Item Type" value={itemType} onChange={setItemType} />
+                  <InputField label="MRP" type="number" value={mrp} onChange={setMrp} />
+                  <InputField label="Discount" type="number" value={discount} onChange={setDiscount} />
+                  <InputField label="GST%" type="number" value={gst} readOnly />
                 </div>
-                <InputField label="Unit" value={unit} onChange={setUnit} />
-                <InputField label="Sale Price" type="number" value={salePrice} onChange={setSalePrice} />
-                <InputField label="Item Type" value={itemType} onChange={setItemType} />
-                <InputField label="MRP" type="number" value={mrp} onChange={setMrp} />
-                <InputField label="Weight Per Qty" type="number" value={weight} onChange={setWeight} />
-                <InputField label="Purchase Price" type="number" value={purchasePrice} onChange={setPurchasePrice} />
-                <InputField label="Discount" type="number" value={discount} onChange={setDiscount} />
-                <InputField label="GST%" type="number" value={gst} readOnly />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={handleSave}>Save</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button onClick={handleSave}>Save</Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          {/* Advance */}
+          <TabsContent value="password" className="h-full">
+            <Card className="border-2 border-gray-200">
+              <CardHeader>
+                <CardTitle>Advance</CardTitle>
+                <CardDescription>Financial details of the item.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Opening Balance</Label>
+                    <Input type="number" onChange={e => setOpenBal(+e.target.value || 0)} value={openBal} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Dr/Cr</Label>
+                    <Input type="number" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Last Year Balance</Label>
+                    <Input type="number" onChange={e => setLastBal(+e.target.value || 0)} value={lastBal} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Dr/Cr</Label>
+                    <Input type="number" />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button onClick={handleSave}>Save</Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

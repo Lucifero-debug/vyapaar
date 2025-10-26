@@ -21,7 +21,7 @@ const itemSchema = new mongoose.Schema({
     type:Number,
    }, 
    unit:{
-    type:Number,
+    type:String,
    }, 
    salePrice:{
     type:Number,

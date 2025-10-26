@@ -32,6 +32,7 @@ const PageContent = () => {
   const [email, setEmail] = useState('');
   const [aadhar, setAadhar] = useState('');
   const [pan, setPan] = useState('');
+  const [dealerType,setDealerType] =useState("")
   const [bank, setBank] = useState(0);
   const [interest, setInterest] = useState(0);
   const [discount, setDiscount] = useState(0);
@@ -65,6 +66,7 @@ const PageContent = () => {
           setBank(d.bank || 0);
           setInterest(d.interest || 0);
           setDiscount(d.discount || 0);
+          setDealerType(d.dealerType || '')
         })
         .catch(error => console.error('Error fetching customer data:', error));
     }
@@ -98,104 +100,157 @@ const PageContent = () => {
   }
 
   return (
-    <div className='w-full h-full flex items-center justify-center'>
-      <Tabs defaultValue="account" className="w-[400px]">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="account">Standard</TabsTrigger>
-          <TabsTrigger value="password">Address</TabsTrigger>
-        </TabsList>
+<div className="w-full flex justify-center">
+  <Tabs defaultValue="account" className="flex flex-col md:flex-row w-[95vw] md:w-[80vw]">
+    {/* Tabs List */}
+    <TabsList
+      className="
+        flex 
+        md:flex-col 
+        justify-start 
+        md:w-[200px] 
+        w-full 
+        overflow-x-auto 
+        h-28
+        border-b md:border-b-0 md:border-r 
+        border-gray-300 
+        rounded-none 
+        bg-white
+      "
+    >
+      <TabsTrigger
+        value="account"
+        className="
+          flex-1 
+          md:w-full 
+          justify-center md:justify-start 
+          px-4 py-3 
+          text-sm 
+          whitespace-nowrap
+          rounded-none 
+          data-[state=active]:bg-blue-100 
+          data-[state=active]:text-blue-600
+        "
+      >
+        Standard
+      </TabsTrigger>
+      <TabsTrigger
+        value="password"
+        className="
+          flex-1 
+          md:w-full 
+          justify-center md:justify-start 
+          px-4 py-3 
+          text-sm 
+          whitespace-nowrap
+          rounded-none 
+          data-[state=active]:bg-blue-100 
+          data-[state=active]:text-blue-600
+        "
+      >
+        Address
+      </TabsTrigger>
+    </TabsList>
 
-        {/* Standard Tab */}
-        <TabsContent value="account">
-          <Card>
-            <CardHeader>
-              <CardTitle>Standard</CardTitle>
-              <CardDescription>
-                {value ? "Update customer details" : "Add new customer"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="space-y-1">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" value={name} onChange={e => setName(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="short">Short Name</Label>
-                <Input id="short" value={short} onChange={e => setShort(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="group">Group</Label>
-                <Input id="group" value={group} onChange={e => setGroup(e.target.value)} />
-              </div>
-              <div className='grid grid-cols-2 gap-2'>
-                <div className="space-y-1">
-                  <Label>Opening Balance</Label>
-                  <Input type='number' value={openBal} onChange={e => setOpenBal(+e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Dr/Cr</Label>
-                  <Input type='number' />
-                </div>
-                <div className="space-y-1">
-                  <Label>Last Year Balance</Label>
-                  <Input type='number' value={lastBal} onChange={e => setLastBal(+e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Dr/Cr</Label>
-                  <Input type='number' />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button>Next</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
+    {/* Tab Content */}
+    <div className="flex-1 p-3 md:p-5 overflow-auto">
+      {/* Standard Tab */}
+      <TabsContent value="account" className="h-full">
+        <Card>
+          <CardHeader>
+            <CardTitle>Standard</CardTitle>
+            <CardDescription>
+              {value ? "Update customer details" : "Add new customer"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" value={name} onChange={e => setName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="short">Short Name</Label>
+              <Input id="short" value={short} onChange={e => setShort(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="group">Group</Label>
+              <Input id="group" value={group} onChange={e => setGroup(e.target.value)} />
+            </div>
 
-        {/* Address Tab */}
-        <TabsContent value="password">
-          <Card className='w-[60vw] border-4 border-black'>
-            <CardHeader>
-              <CardTitle>Address</CardTitle>
-              <CardDescription>
-                {value ? "Edit address and contact" : "Enter address details"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className='grid grid-cols-3 gap-3'>
-                {[
-                  { label: 'Address', val: address, fn: setAddress, type: 'text' },
-                  { label: 'Pincode', val: pincode, fn: setPincode, type: 'number' },
-                  { label: 'City', val: city, fn: setCity, type: 'text' },
-                  { label: 'Phone', val: phone, fn: setPhone, type: 'number' },
-                  { label: 'GSTIN', val: gstIn, fn: setGstIn, type: 'text' },
-                  { label: 'State', val: state, fn: setState, type: 'text' },
-                  { label: 'State Code', val: stateCode, fn: setStateCode, type: 'number' },
-                  { label: 'Email', val: email, fn: setEmail, type: 'text' },
-                  { label: 'PAN', val: pan, fn: setPan, type: 'text' },
-                  { label: 'Aadhar', val: aadhar, fn: setAadhar, type: 'number' },
-                  { label: 'Bank', val: bank, fn: setBank, type: 'number' },
-                  { label: 'Discount', val: discount, fn: setDiscount, type: 'number' },
-                  { label: 'Interest', val: interest, fn: setInterest, type: 'number' },
-                ].map((field, idx) => (
-                  <div className="space-y-1" key={idx}>
-                    <Label>{field.label}</Label>
-                    <Input
-                      type={field.type}
-                      value={field.val}
-                      onChange={e => field.fn(field.type === 'number' ? +e.target.value : e.target.value)}
-                    />
-                  </div>
-                ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Opening Balance</Label>
+                <Input type='number' value={openBal} onChange={e => setOpenBal(+e.target.value)} />
               </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={handleSave}>Save</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              <div className="space-y-1">
+                <Label>Dr/Cr</Label>
+                <Input type='number' />
+              </div>
+              <div className="space-y-1">
+                <Label>Last Year Balance</Label>
+                <Input type='number' value={lastBal} onChange={e => setLastBal(+e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Dr/Cr</Label>
+                <Input type='number' />
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button>Next</Button>
+          </CardFooter>
+        </Card>
+      </TabsContent>
+
+      {/* Address Tab */}
+      <TabsContent value="password" className="h-full">
+        <Card className="border-2 border-gray-300">
+          <CardHeader>
+            <CardTitle>Address</CardTitle>
+            <CardDescription>
+              {value ? "Edit address and contact" : "Enter address details"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {[
+                { label: 'Address', val: address, fn: setAddress, type: 'text' },
+                { label: 'Pincode', val: pincode, fn: setPincode, type: 'number' },
+                { label: 'City', val: city, fn: setCity, type: 'text' },
+                { label: 'Phone', val: phone, fn: setPhone, type: 'number' },
+                { label: 'GSTIN', val: gstIn, fn: setGstIn, type: 'text' },
+                { label: 'State', val: state, fn: setState, type: 'text' },
+                { label: 'State Code', val: stateCode, fn: setStateCode, type: 'number' },
+                { label: 'Email', val: email, fn: setEmail, type: 'text' },
+                { label: 'PAN', val: pan, fn: setPan, type: 'text' },
+                { label: 'Aadhar', val: aadhar, fn: setAadhar, type: 'number' },
+                { label: 'Bank', val: bank, fn: setBank, type: 'number' },
+                { label: 'Discount', val: discount, fn: setDiscount, type: 'number' },
+                { label: 'Interest', val: interest, fn: setInterest, type: 'number' },
+                { label: 'Dealer Type', val: dealerType, fn: setDealerType, type: 'text' },
+              ].map((field, idx) => (
+                <div className="space-y-1" key={idx}>
+                  <Label>{field.label}</Label>
+                  <Input
+                    type={field.type}
+                    value={field.val}
+                    onChange={e => field.fn(field.type === 'number' ? +e.target.value : e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button onClick={handleSave}>Save</Button>
+          </CardFooter>
+        </Card>
+      </TabsContent>
     </div>
+  </Tabs>
+</div>
+
+
+
   );
 };
 

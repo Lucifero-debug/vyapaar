@@ -1,69 +1,42 @@
-import { connect } from '../../../lib/mongodb';
-import Voucher from '../../../models/voucherModel';
+import { NextResponse } from "next/server";
+import { connect } from "../../../lib/mongodb";
+import Invoice from "../../../models/invoiceModel";
+import Customer from "../../../models/custModel";
 
-export const GET = async () => {
-  await connect();
+export async function GET(req) {
+  try {
+    await connect();
 
-  const vouchers = await Voucher.find().sort({ date: 1 });
+    const { searchParams } = new URL(req.url);
+    const customerId = searchParams.get("customerId");
 
-  const ledgerMap = {};
-
-  for (const v of vouchers) {
-    const { date, acName, customers, paymentType } = v;
-
-    // Add entry for the main account (cash or bank)
-    if (!ledgerMap[acName]) ledgerMap[acName] = [];
-
-    let totalDebit = 0;
-    let totalCredit = 0;
-
-    for (const c of customers) {
-      const debit = c.debit || 0;
-      const credit = c.credit || 0;
-      totalDebit += debit;
-      totalCredit += credit;
-
-      // Add entry for each customer
-      if (!ledgerMap[c.name]) ledgerMap[c.name] = [];
-
-      ledgerMap[c.name].push({
-        date,
-        type: paymentType,   // cash or bank
-        account: acName,
-        debit,
-        credit,
-      });
+    if (!customerId) {
+      return NextResponse.json(
+        { error: "Customer ID is required." },
+        { status: 400 }
+      );
     }
 
-    // Add reverse entry for cash/bank side
-const customerDetails = customers.map((c) => {
-  const parts = [];
-  if (c.debit) parts.push(`${c.name}: Dr ₹${c.debit}`);
-  if (c.credit) parts.push(`${c.name}: Cr ₹${c.credit}`);
-  return parts.join(', ');
-}).join('; ');
+    // 🔹 Fetch customer info
+    const customer = await Customer.findById(customerId).lean();
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found." },
+        { status: 404 }
+      );
+    }
 
-ledgerMap[acName].push({
-  date,
-  type: paymentType,
-  account: customerDetails,
-  debit: totalCredit,
-  credit: totalDebit,
-});
+    // 🔹 Fetch invoices linked by customer.custId
+    const invoices = await Invoice.find({ "customer.custId": customerId })
+      .sort({ date: 1 })
+      .lean();
+
+    return NextResponse.json({ customer, invoices });
+  } catch (error) {
+    console.error("Ledger API error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch ledger data." },
+      { status: 500 }
+    );
   }
-
-  // Calculate running balance for each account
-  const finalLedger = {};
-  for (const [accountName, entries] of Object.entries(ledgerMap)) {
-    let balance = 0;
-    finalLedger[accountName] = entries.map((entry) => {
-      balance += entry.debit - entry.credit;
-      return {
-        ...entry,
-        balance,
-      };
-    });
-  }
-
-  return Response.json(finalLedger);
-};
+}

@@ -300,7 +300,7 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
 
 {partyTaxes?.length > 0 && (
   <section className="max-w-xs ml-auto mt-4 text-right space-y-1">
-    <h3 className="text-md font-semibold text-gray-700 mb-2">Additional Taxes:</h3>
+    <h3 className="text-md font-semibold text-gray-700 mb-2">Additional Overhead:</h3>
     {partyTaxes.map((tax, idx) => (
       <div key={idx} className="text-sm text-gray-600 flex justify-between">
         <span>{tax.name} ({tax.rate ? `${tax.rate}%` : `₹${tax.amount}`}):</span>

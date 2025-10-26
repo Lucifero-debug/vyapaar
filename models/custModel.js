@@ -66,6 +66,9 @@ type:String,
    },
    lastMode:{
     type:String
+   },
+   dealerType:{
+    type:String
    }
 })
 

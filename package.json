@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-     "electron": "electron-builder",
+    "electron": "electron-builder",
     "start": "next start",
     "lint": "next lint",
     "email": "email dev",
     "export": "next export"
   },
   "dependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^6.2.0",
@@ -57,16 +59,22 @@
     "appId": "com.vyapaar.app",
     "productName": "Vyapaar",
     "win": {
-    "target": [
-    {
-      "target": "nsis",
-      "arch": ["x64", "ia32"]
-    },
-    {
-      "target": "portable",
-      "arch": ["x64", "ia32"]
-    }
-  ],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ],
       "icon": "build/icon.ico"
     },
     "mac": {
