@@ -31,7 +31,7 @@ const customerSchema = new mongoose.Schema({
     type:Number,
    }, 
    bank:{
-    type:Number,
+    type:String,
    }, 
    pan:{
 type:String,
