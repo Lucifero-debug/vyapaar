@@ -35,10 +35,10 @@ const invoiceSchema = new mongoose.Schema(
     amount: { type: Number, required: true },
   }
 ],
-    paymentType: { type: String, required: true },  // e.g. Cash / Cheque
-    stateOfSupply: { type: String, required: true }, // e.g. Delhi
-    taxType: { type: String, required: true },  // local / central
-    gst: { type: Number, required: true },
+    paymentType: { type: String },  // e.g. Cash / Cheque
+    stateOfSupply: { type: String }, // e.g. Delhi
+    taxType: { type: String },  // local / central
+    gst: { type: Number },
     totalAmount: { type: Number, required: true },
     finalAmount: { type: Number, required: true },
     received: { type: Number, required: true },
