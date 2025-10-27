@@ -60,32 +60,55 @@ export default function LedgerPage() {
     return <div className="p-6 text-center text-red-500">Error: {error}</div>;
 
   // 🧮 Generate voucher-style entries for each invoice
-  const generateEntries = (invoice) => {
-    const itemTotal = invoice.items?.reduce((sum, item) => sum + (item.total || 0), 0) || 0;
-    const entries = [
-      ...(invoice.partyTaxes || []).map((tax) => ({
-        description: `BY ${tax.name?.toUpperCase() || 'TAX'}`,
-        debit: 0,
-        credit: tax.total || 0,
-      })),
-      {
-        description: `BY ${invoice.taxType?.toUpperCase() || 'SALE'} SALE`,
-        debit: 0,
-        credit: invoice.gst || 0,
-      },
-      {
-        description: `BY ITEMS`,
-        debit: 0,
-        credit: itemTotal,
-      },
-      {
-        description: `TO ${invoice.customer?.name || 'CUSTOMER'}\n(Invoice No. ${invoice.invoiceNo || 'N/A'})`,
-        debit: invoice.finalAmount || 0,
-        credit: 0,
-      },
-    ];
-    return entries;
-  };
+const generateEntries = (invoice) => {
+  const itemTotal = invoice.items?.reduce((sum, item) => sum + (item.total || 0), 0) || 0;
+  const taxTotal = (invoice.partyTaxes || []).reduce((sum, t) => sum + (t.total || 0), 0);
+  const gstAmount = invoice.gst || 0;
+  const finalAmount = invoice.finalAmount || 0;
+
+  // ✅ Ensure debit = credit = finalAmount
+  // Credit: Sales + GST + Other taxes
+  // Debit: Customer
+  const entries = [
+    {
+      description: `BY ${invoice.taxType?.toUpperCase() || 'SALE'} SALE`,
+      debit: 0,
+      credit: itemTotal,
+    },
+    ...(invoice.partyTaxes || []).map((tax) => ({
+      description: `BY ${tax.name?.toUpperCase()}`,
+      debit: 0,
+      credit: tax.total || 0,
+    })),
+    gstAmount > 0 && {
+      description: `BY GST`,
+      debit: 0,
+      credit: gstAmount,
+    },
+    {
+      description: `TO ${invoice.customer?.name || 'CUSTOMER'}\n(Invoice No. ${invoice.invoiceNo || 'N/A'})`,
+      debit: finalAmount,
+      credit: 0,
+    },
+  ].filter(Boolean);
+
+  // For double-checking consistency
+  const totalDebit = entries.reduce((sum, e) => sum + (e.debit || 0), 0);
+  const totalCredit = entries.reduce((sum, e) => sum + (e.credit || 0), 0);
+
+  // If rounding mismatch occurs (like 0.01 difference)
+  if (Math.abs(totalDebit - totalCredit) > 0.01) {
+    const diff = totalDebit - totalCredit;
+    entries.push({
+      description: diff > 0 ? 'ADJ. CREDIT ROUNDING' : 'ADJ. DEBIT ROUNDING',
+      debit: diff < 0 ? Math.abs(diff) : 0,
+      credit: diff > 0 ? Math.abs(diff) : 0,
+    });
+  }
+
+  return entries;
+};
+
 
   const processedInvoices = invoices.map((invoice) => {
     const entries = generateEntries(invoice);
@@ -95,21 +118,64 @@ export default function LedgerPage() {
   });
 
   // 🧾 Process vouchers (each voucher can have multiple customers)
-  const processedVouchers = vouchers
-    .filter(v => v.customers?.some(c => c.custId === customerId))
-.map((voucher) => {
-  const entries = voucher.customers
-    .filter(c => c.custId === customerId)
-    .map((cust) => ({
-      description: `${voucher.paymentType?.toUpperCase() || ''} VOUCHER - ${voucher.acName || ''}`,
-      debit: cust.debit || 0,
-      credit: cust.credit || 0,
-    }));
-  
-  const totalDebit = entries.reduce((sum, e) => sum + (e.debit || 0), 0);
-  const totalCredit = entries.reduce((sum, e) => sum + (e.credit || 0), 0);
-  return { type: "voucher", voucher, entries, totalDebit, totalCredit };
-});
+// 🧾 Process vouchers (each voucher can have multiple customers)
+const processedVouchers = vouchers
+  .filter(v => v.customers?.some(c => c.custId === customerId))
+  .map((voucher) => {
+    // Get total debit/credit of all customers in this voucher
+    const totalCustomerDebit = voucher.customers.reduce((sum, c) => sum + (c.debit || 0), 0);
+    const totalCustomerCredit = voucher.customers.reduce((sum, c) => sum + (c.credit || 0), 0);
+
+    // The ledger should show:
+    // 1️⃣ Cash/Bank A/c
+    // 2️⃣ Customer A/c (current customer only)
+    const entries = [];
+
+    // 1️⃣ Cash/Bank (Voucher Account)
+    // If customer was credited, bank/cash must be debited (and vice versa)
+    if (totalCustomerDebit > 0) {
+      // Customer got DEBIT (payment received) → Cash/Bank is CREDIT
+      entries.push({
+        description: `${voucher.acName?.toUpperCase() || 'CASH/BANK'} A/C`,
+        debit: 0,
+        credit: totalCustomerDebit,
+      });
+    }
+    if (totalCustomerCredit > 0) {
+      // Customer got CREDIT (payment made) → Cash/Bank is DEBIT
+      entries.push({
+        description: `${voucher.acName?.toUpperCase() || 'CASH/BANK'} A/C`,
+        debit: totalCustomerCredit,
+        credit: 0,
+      });
+    }
+
+    // 2️⃣ Customer Account (this customer only)
+    voucher.customers
+      .filter(c => c.custId === customerId)
+      .forEach(cust => {
+        if (cust.debit > 0) {
+          entries.push({
+            description: `TO ${voucher.paymentType?.toUpperCase() || ''} - ${voucher.acName || ''}`,
+            debit: cust.debit,
+            credit: 0,
+          });
+        }
+        if (cust.credit > 0) {
+          entries.push({
+            description: `BY ${voucher.paymentType?.toUpperCase() || ''} - ${voucher.acName || ''}`,
+            debit: 0,
+            credit: cust.credit,
+          });
+        }
+      });
+
+    const totalDebit = entries.reduce((sum, e) => sum + (e.debit || 0), 0);
+    const totalCredit = entries.reduce((sum, e) => sum + (e.credit || 0), 0);
+
+    return { type: "voucher", voucher, entries, totalDebit, totalCredit };
+  });
+
 
 
   // Merge both for display
