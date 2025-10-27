@@ -12,6 +12,7 @@ customers: [
     name: { type: String, required: true },
     debit: { type: Number, default: 0 },
     credit: { type: Number, default: 0 },
+    custId:{type:String}
   }
 ],
    paymentType: { type: String }, 

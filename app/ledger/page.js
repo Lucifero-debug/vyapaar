@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { Suspense, useEffect, useState } from 'react';
-import LedgerSearchParams from '../../components/LedgerSuspense'; // ✅ fixed import
+import LedgerSearchParams from '../../components/LedgerSuspense';
 
 const formatAmount = (amount = 0) => amount.toFixed(2);
 
@@ -10,22 +10,30 @@ export default function LedgerPage() {
   const [customerId, setCustomerId] = useState('');
   const [customer, setCustomer] = useState(null);
   const [invoices, setInvoices] = useState([]);
+  const [vouchers, setVouchers] = useState([]); // 👈 added
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!customerId) return;
 
-    
     const fetchLedger = async () => {
       try {
-        const res = await fetch(`/api/ledger?customerId=${customerId}`);
-        if (!res.ok) throw new Error("Failed to fetch customer ledger.");
-        const data = await res.json();
+        setLoading(true);
 
-        setCustomer(data.customer || null);
-        setInvoices(data.invoices || []);
-        console.log("ripyaa",data)
+        // 🧾 Fetch invoices
+        const invRes = await fetch(`/api/ledger?customerId=${customerId}`);
+        if (!invRes.ok) throw new Error("Failed to fetch customer ledger.");
+        const invData = await invRes.json();
+
+        // 💳 Fetch vouchers
+        const vouRes = await fetch(`/api/ledger-voucher?customerId=${customerId}`);
+        const vouData = vouRes.ok ? await vouRes.json() : [];
+
+        setCustomer(invData.customer || null);
+        setInvoices(invData.invoices || []);
+        setVouchers(vouData.vouchers || []); // 👈 set vouchers
+        console.log("wow",vouData.vouchers[0])
       } catch (err) {
         setError(err.message);
       } finally {
@@ -83,11 +91,32 @@ export default function LedgerPage() {
     const entries = generateEntries(invoice);
     const totalDebit = entries.reduce((sum, e) => sum + (e.debit || 0), 0);
     const totalCredit = entries.reduce((sum, e) => sum + (e.credit || 0), 0);
-    return { invoice, entries, totalDebit, totalCredit };
+    return { type: "invoice", invoice, entries, totalDebit, totalCredit };
   });
 
-  const grandTotalDebit = processedInvoices.reduce((sum, inv) => sum + inv.totalDebit, 0);
-  const grandTotalCredit = processedInvoices.reduce((sum, inv) => sum + inv.totalCredit, 0);
+  // 🧾 Process vouchers (each voucher can have multiple customers)
+  const processedVouchers = vouchers
+    .filter(v => v.customers?.some(c => c.custId === customerId))
+.map((voucher) => {
+  const entries = voucher.customers
+    .filter(c => c.custId === customerId)
+    .map((cust) => ({
+      description: `${voucher.paymentType?.toUpperCase() || ''} VOUCHER - ${voucher.acName || ''}`,
+      debit: cust.debit || 0,
+      credit: cust.credit || 0,
+    }));
+  
+  const totalDebit = entries.reduce((sum, e) => sum + (e.debit || 0), 0);
+  const totalCredit = entries.reduce((sum, e) => sum + (e.credit || 0), 0);
+  return { type: "voucher", voucher, entries, totalDebit, totalCredit };
+});
+
+
+  // Merge both for display
+  const allEntries = [...processedInvoices, ...processedVouchers];
+
+  const grandTotalDebit = allEntries.reduce((sum, inv) => sum + inv.totalDebit, 0);
+  const grandTotalCredit = allEntries.reduce((sum, inv) => sum + inv.totalCredit, 0);
 
   return (
     <>
@@ -108,46 +137,52 @@ export default function LedgerPage() {
           </p>
         </div>
 
-        {/* 🧮 Ledger Entries */}
-        {processedInvoices.length > 0 ? (
+        {/* 🧾 Combined Invoices + Vouchers */}
+        {allEntries.length > 0 ? (
           <>
-            {processedInvoices.map(({ invoice, entries, totalDebit, totalCredit }, index) => (
-              <div key={index} className="mb-8 border border-gray-300 rounded-lg overflow-hidden">
-                <table className="w-full table-fixed text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-gray-100 border-b border-gray-300">
-                      <th className="w-1/5 px-2 py-2 text-left">DATE</th>
-                      <th className="w-2/5 px-2 py-2 text-left">DESCRIPTION</th>
-                      <th className="w-1/5 px-2 py-2 text-right">DEBIT</th>
-                      <th className="w-1/5 px-2 py-2 text-right">CREDIT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border-t border-gray-300 px-2 py-2 align-top">
-                        {invoice.date ? new Date(invoice.date).toLocaleDateString('en-IN') : 'N/A'}
-                      </td>
-                      <td colSpan="3" className="border-t border-gray-300 px-2 py-2">
-                        {entries.map((entry, i) => (
-                          <div key={i} className="flex justify-between items-start mb-1">
-                            <span className="whitespace-pre-line">{entry.description}</span>
-                            <span className="w-1/5 text-right">{entry.debit ? formatAmount(entry.debit) : ''}</span>
-                            <span className="w-1/5 text-right">{entry.credit ? formatAmount(entry.credit) : ''}</span>
-                          </div>
-                        ))}
-                      </td>
-                    </tr>
-                  </tbody>
-                  <tfoot>
-                    <tr className="font-bold bg-gray-100 border-t border-gray-300">
-                      <td colSpan="2" className="px-2 py-2 text-right">TOTAL :-</td>
-                      <td className="px-2 py-2 text-right">{formatAmount(totalDebit)}</td>
-                      <td className="px-2 py-2 text-right">{formatAmount(totalCredit)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ))}
+            {allEntries.map((entryBlock, index) => {
+              const date = entryBlock.type === "invoice"
+                ? entryBlock.invoice.date
+                : entryBlock.voucher.date;
+
+              return (
+                <div key={index} className="mb-8 border border-gray-300 rounded-lg overflow-hidden">
+                  <table className="w-full table-fixed text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 border-b border-gray-300">
+                        <th className="w-1/5 px-2 py-2 text-left">DATE</th>
+                        <th className="w-2/5 px-2 py-2 text-left">DESCRIPTION</th>
+                        <th className="w-1/5 px-2 py-2 text-right">DEBIT</th>
+                        <th className="w-1/5 px-2 py-2 text-right">CREDIT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="border-t border-gray-300 px-2 py-2 align-top">
+                          {date ? new Date(date).toLocaleDateString('en-IN') : 'N/A'}
+                        </td>
+                        <td colSpan="3" className="border-t border-gray-300 px-2 py-2">
+                          {entryBlock.entries.map((entry, i) => (
+                            <div key={i} className="flex justify-between items-start mb-1">
+                              <span className="whitespace-pre-line">{entry.description}</span>
+                              <span className="w-1/5 text-right">{entry.debit ? formatAmount(entry.debit) : ''}</span>
+                              <span className="w-1/5 text-right">{entry.credit ? formatAmount(entry.credit) : ''}</span>
+                            </div>
+                          ))}
+                        </td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr className="font-bold bg-gray-100 border-t border-gray-300">
+                        <td colSpan="2" className="px-2 py-2 text-right">TOTAL :-</td>
+                        <td className="px-2 py-2 text-right">{formatAmount(entryBlock.totalDebit)}</td>
+                        <td className="px-2 py-2 text-right">{formatAmount(entryBlock.totalCredit)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              );
+            })}
 
             <div className="border-t border-gray-400 pt-4">
               <table className="w-full table-fixed text-sm border-collapse">
@@ -163,7 +198,7 @@ export default function LedgerPage() {
           </>
         ) : (
           <div className="text-center text-gray-500 italic py-8">
-            No invoices found for this customer.
+            No invoices or vouchers found for this customer.
           </div>
         )}
       </div>
