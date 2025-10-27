@@ -5,19 +5,15 @@ import { type } from "os";
 const customerSchema = new mongoose.Schema({
     name:{
         type:String,
-        required:[true,"Please provide a username"],
     },
     email:{
         type:String,
-        required:[true,"Please provide a email"],
     },
    group:{
     type:String,
-    required:[true,"Please provide a group"],
    }, 
    address:{
     type:String,
-    required:[true,"Please provide a address"],
    }, 
    city:{
     type:String,
