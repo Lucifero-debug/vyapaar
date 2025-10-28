@@ -724,71 +724,95 @@ setGst(totalGst);
                                     <tr key={index} className='even:bg-gray-50 odd:bg-white'>
                                         <td className='py-2 px-4 border border-gray-300'>{items.name}</td>
                                         <td className='py-2 px-4 border border-gray-300'>
-                                            <input 
-                                                type='number' 
-                                                min='1' 
-                                                className='w-16 px-2 border rounded' 
-                                                value={items.quantity} 
-                                                onChange={(e) => {
-                                                    const newQuantity = parseFloat(e.target.value) || 0;
-                                                    setSelectedItem(prev =>
-                                                        prev.map((item, idx) =>
-                                                            idx === index
-                                                                ? { 
-                                                                    ...item, 
-                                                                    quantity: newQuantity, 
-                                                                    total: (item.cost * newQuantity) - ((item.cost * newQuantity) * item.discount) / 100 
-                                                                }
-                                                                : item
-                                                        )
-                                                    );
-                                                }} 
-                                            />
+<input 
+    type='number' 
+    min='1' 
+    className='w-16 px-2 border rounded' 
+    value={items.quantity} 
+    onChange={(e) => {
+        const newQuantity = parseFloat(e.target.value) || 0;
+        setSelectedItem(prev =>
+            prev.map((item, idx) => {
+                if (idx === index) {
+                    const subtotal = item.cost * newQuantity;
+                    const discountAmount = (subtotal * (item.discount || 0)) / 100;
+                    const taxableAmount = subtotal - discountAmount;
+                    const gstAmount = (taxableAmount * (item.gst || 0)) / 100;
+                    const newTotal = taxableAmount + gstAmount;
+                    
+                    return { 
+                        ...item, 
+                        quantity: newQuantity,
+                        gstAmount: gstAmount,
+                        total: newTotal
+                    };
+                }
+                return item;
+            })
+        );
+    }} 
+/>
                                         </td>
                                         <td className='py-2 px-4 border border-gray-300'>
-                                            <input 
-                                                type='number' 
-                                                min='0' 
-                                                className='w-16 px-2 border rounded' 
-                                                value={items.cost} 
-                                                onChange={(e) => {
-                                                    const newCost = parseFloat(e.target.value) || 0;
-                                                    setSelectedItem(prev =>
-                                                        prev.map((item, idx) =>
-                                                            idx === index
-                                                                ? { 
-                                                                    ...item, 
-                                                                    cost: newCost, 
-                                                                    total: (newCost * item.quantity) - ((newCost * item.quantity) * item.discount) / 100 
-                                                                }
-                                                                : item
-                                                        )
-                                                    );
-                                                }} 
-                                            />
+<input 
+    type='number' 
+    min='0' 
+    className='w-16 px-2 border rounded' 
+    value={items.cost} 
+    onChange={(e) => {
+        const newCost = parseFloat(e.target.value) || 0;
+        setSelectedItem(prev =>
+            prev.map((item, idx) => {
+                if (idx === index) {
+                    const subtotal = newCost * item.quantity;
+                    const discountAmount = (subtotal * (item.discount || 0)) / 100;
+                    const taxableAmount = subtotal - discountAmount;
+                    const gstAmount = (taxableAmount * (item.gst || 0)) / 100;
+                    const newTotal = taxableAmount + gstAmount;
+                    
+                    return { 
+                        ...item, 
+                        cost: newCost,
+                        gstAmount: gstAmount,
+                        total: newTotal
+                    };
+                }
+                return item;
+            })
+        );
+    }} 
+/>
                                         </td>
                                         <td className='py-2 px-4 border border-gray-300'>
-                                            <input
-                                                type='number'
-                                                min='0'
-                                                max='100'
-                                                className='w-16 px-2 border rounded'
-                                                value={items.discount}
-                                                onChange={(e) => {
-                                                    const newDiscount = parseFloat(e.target.value) || 0;
-                                                    setSelectedItem(prev =>
-                                                        prev.map((item, idx) =>
-                                                            idx === index
-                                                                ? {
-                                                                    ...item,
-                                                                    discount: newDiscount,
-                                                                    total: (item.cost * item.quantity) - ((item.cost * item.quantity) * newDiscount) / 100,
-                                                                }
-                                                                : item
-                                                        )
-                                                    );
-                                                }}
-                                            />
+<input
+    type='number'
+    min='0'
+    max='100'
+    className='w-16 px-2 border rounded'
+    value={items.discount}
+    onChange={(e) => {
+        const newDiscount = parseFloat(e.target.value) || 0;
+        setSelectedItem(prev =>
+            prev.map((item, idx) => {
+                if (idx === index) {
+                    const subtotal = item.cost * item.quantity;
+                    const discountAmount = (subtotal * newDiscount) / 100;
+                    const taxableAmount = subtotal - discountAmount;
+                    const gstAmount = (taxableAmount * (item.gst || 0)) / 100;
+                    const newTotal = taxableAmount + gstAmount;
+                    
+                    return {
+                        ...item,
+                        discount: newDiscount,
+                        gstAmount: gstAmount,
+                        total: newTotal
+                    };
+                }
+                return item;
+            })
+        );
+    }}
+/>
                                         </td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.gst}</td>
