@@ -116,7 +116,7 @@ setCash(
 );
 
 // console.log("Fetched Bank:", bank);
-console.log("Fetched Cash:", voucherData);
+console.log("Fetched Cash:", cash);
 
 
         // Categorize invoices
@@ -195,16 +195,10 @@ case 'HSN':
       break;
 
       case'Bank':
-          const selectedBank = bank.find(b => b.name === newValue);
-          if (selectedBank) {
-            router.push(`/voucheradd?type=Bank&value=${selectedBank.id}`);
-          }
+            router.push(`/voucheradd?type=Bank&value=${newValue}`);
           break;
       case'Cash':
-          const selectedCash = cash.find(c => c.name === newValue);
-          if (selectedCash) {
-            router.push(`/voucheradd?type=Cash&value=${selectedCash.id}`);
-          }
+            router.push(`/voucheradd?type=Cash&value=${newValue}`);
           break;
 
         default:
@@ -690,6 +684,23 @@ case 'HSN':
               <CommandList>
                 <CommandEmpty>No customers found.</CommandEmpty>
                 <CommandGroup>
+                      <CommandItem
+      key="all"
+      value="0"
+      onSelect={() => {
+        setValue("0");
+        setOpen(false);
+        router.push(`/ledger?customerId=0`);
+      }}
+    >
+      🧾 All Accounts
+      <Check
+        className={cn(
+          "ml-auto",
+          value === "0" ? "opacity-100" : "opacity-0"
+        )}
+      />
+    </CommandItem>
                   {customer.map((cust) => (
                     <CommandItem
                       key={cust.id}
@@ -754,14 +765,15 @@ case 'HSN':
                     <CommandEmpty>No result found.</CommandEmpty>
                     <CommandGroup>
                       {getEntities().map((entity) => {
-                        const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: alterState === 'Bank' || alterState=='Cash'?entity.name: entity.invoiceNo;
+                        const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: alterState === 'Bank' || alterState=='Cash'?entity.id: entity.invoiceNo;
+                        const value=entity.name
                         return (
                           <CommandItem
                             key={key}
                             value={String(key)}
                             onSelect={(currentValue) => handleSelect(currentValue)}
                           >
-                            {key}
+                            {value}
                             <Check className={cn('ml-auto', value === key ? 'opacity-100' : 'opacity-0')} />
                           </CommandItem>
                         );
