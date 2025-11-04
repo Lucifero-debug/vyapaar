@@ -23,10 +23,10 @@ const ledgerSchema = new mongoose.Schema({
   },
   balance: {
     type: Number,
-    default: 0, // Calculated running balance
+    default: 0,
   },
     narration: {
-    type: String, // <-- ADD THIS
+    type: String, 
   },
   voucherId: {
     type: mongoose.Schema.Types.ObjectId,

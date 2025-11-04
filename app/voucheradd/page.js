@@ -11,15 +11,16 @@ const AddVoucher = () => {
     date: new Date().toISOString().slice(0, 10),
     againstBill: false,
     acType: "",
+    narration: "", // 🔹 Added main narration
   });
 
   const [entries, setEntries] = useState([
-    { name: "", debit: "", credit: "", custId: "" },
+    { name: "", debit: "", credit: "", custId: "", narration: "" }, // 🔹 Added narration
   ]);
 
   const [customers, setCustomers] = useState([]);
 
-  // Fetch all customers
+  // --- existing fetch logic unchanged ---
   useEffect(() => {
     const fetchCust = async () => {
       try {
@@ -35,7 +36,7 @@ const AddVoucher = () => {
     fetchCust();
   }, []);
 
-  // Fetch existing voucher when editing
+  // --- existing voucher fetch logic unchanged (just add narration) ---
   useEffect(() => {
     if (voucherParams.value && customers.length > 0) {
       const fetchVoucher = async () => {
@@ -57,20 +58,20 @@ const AddVoucher = () => {
               new Date().toISOString().slice(0, 10),
             againstBill: voucher.againstBill || false,
             acType: voucher.acType || "",
+            narration: voucher.narration || "", // 🔹 load main narration
           });
 
           setEntries(
             voucher.customers?.map((custEntry) => {
-              const found = customers.find(
-                (c) => c.name === custEntry.name
-              );
+              const found = customers.find((c) => c.name === custEntry.name);
               return {
                 name: custEntry.name || "",
                 debit: custEntry.debit?.toString() || "",
                 credit: custEntry.credit?.toString() || "",
                 custId: found?._id || "",
+                narration: custEntry.narration || "", // 🔹 load customer narration
               };
-            }) || [{ name: "", debit: "", credit: "", custId: "" }]
+            }) || [{ name: "", debit: "", credit: "", custId: "", narration: "" }]
           );
         } catch (err) {
           console.error("Failed to fetch voucher:", err);
@@ -82,7 +83,7 @@ const AddVoucher = () => {
     }
   }, [voucherParams.value, customers]);
 
-  // Handle form changes
+  // --- form change ---
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -91,7 +92,7 @@ const AddVoucher = () => {
     }));
   };
 
-  // Handle entry changes
+  // --- entry change ---
   const handleEntryChange = (index, e) => {
     const { name, value } = e.target;
     setEntries((prev) =>
@@ -112,11 +113,10 @@ const AddVoucher = () => {
     );
   };
 
-  // Add and remove entry rows
   const addEntry = () => {
     setEntries((prev) => [
       ...prev,
-      { name: "", debit: "", credit: "", custId: "" },
+      { name: "", debit: "", credit: "", custId: "", narration: "" },
     ]);
   };
 
@@ -126,11 +126,9 @@ const AddVoucher = () => {
     }
   };
 
-  // Handle submit
+  // --- submit ---
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-
 
     try {
       const endpoint = voucherParams.value
@@ -145,12 +143,14 @@ const AddVoucher = () => {
           date: form.date,
           againstBill: form.againstBill,
           acType: form.acType,
+          narration: form.narration, // 🔹 send main narration
           paymentType: voucherParams.type,
           customers: entries.map((entry) => ({
             name: entry.name,
             debit: parseFloat(entry.debit) || 0,
             credit: parseFloat(entry.credit) || 0,
             custId: entry.custId,
+            narration: entry.narration, // 🔹 send customer narration
           })),
           ...(voucherParams.value && { id: voucherParams.value }),
         }),
@@ -169,9 +169,10 @@ const AddVoucher = () => {
         date: new Date().toISOString().slice(0, 10),
         againstBill: false,
         acType: "",
+        narration: "",
       });
 
-      setEntries([{ name: "", debit: "", credit: "", custId: "" }]);
+      setEntries([{ name: "", debit: "", credit: "", custId: "", narration: "" }]);
       setVoucherParams({ type: "", value: "" });
     } catch (error) {
       alert(error.message);
@@ -188,9 +189,7 @@ const AddVoucher = () => {
         <div className="flex justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">
-              {voucherParams.type === "Cash"
-                ? "Cash Voucher"
-                : "Bank Voucher"}
+              {voucherParams.type === "Cash" ? "Cash Voucher" : "Bank Voucher"}
             </h1>
             <p className="text-sm text-gray-600">Date: {form.date}</p>
           </div>
@@ -202,7 +201,8 @@ const AddVoucher = () => {
               </span>
             </p>
             <p>
-              Type: <span className="font-semibold">{form.acType || "None"}</span>
+              Type:{" "}
+              <span className="font-semibold">{form.acType || "None"}</span>
             </p>
             <p>
               Against Bill:{" "}
@@ -221,6 +221,7 @@ const AddVoucher = () => {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border px-3 py-2">Account Name</th>
+                  <th className="border px-3 py-2">Narration</th> {/* 🔹 Added */}
                   <th className="border px-3 py-2 text-right">Debit</th>
                   <th className="border px-3 py-2 text-right">Credit</th>
                   <th className="border px-3 py-2 text-center">Action</th>
@@ -246,6 +247,16 @@ const AddVoucher = () => {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="border px-2 py-1">
+                      <input
+                        type="text"
+                        name="narration"
+                        value={entry.narration}
+                        onChange={(e) => handleEntryChange(index, e)}
+                        placeholder="Narration..."
+                        className="w-full bg-transparent outline-none"
+                      />
                     </td>
                     <td className="border px-2 py-1 text-right">
                       <input
@@ -279,7 +290,7 @@ const AddVoucher = () => {
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan={4} className="px-3 py-2">
+                  <td colSpan={5} className="px-3 py-2">
                     <button
                       type="button"
                       onClick={addEntry}
@@ -293,7 +304,7 @@ const AddVoucher = () => {
             </table>
           </div>
 
-          {/* Account Details */}
+          {/* Account Details + Main Narration */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
             <div>
               <label className="text-sm font-medium">
@@ -345,6 +356,19 @@ const AddVoucher = () => {
               />
               Against Bill
             </label>
+          </div>
+
+          {/* 🔹 Main Narration Field */}
+          <div>
+            <label className="text-sm font-medium">Main Narration</label>
+            <textarea
+              name="narration"
+              value={form.narration}
+              onChange={handleFormChange}
+              rows={2}
+              placeholder="Enter narration for main account..."
+              className="w-full border px-3 py-1 rounded-md"
+            />
           </div>
 
           <button

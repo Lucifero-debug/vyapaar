@@ -814,7 +814,7 @@ setGst(totalGst);
 />
                                         </td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
-                                        <td className='py-2 px-4 border border-gray-300'>{items.gst}</td>
+                                        <td className='py-2 px-4 border border-gray-300'>{items.gst || 0}</td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.total.toFixed(2)}</td>
                                         <td className='py-2 px-4 border border-gray-300'>
                                             <button 

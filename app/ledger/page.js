@@ -9,8 +9,7 @@ const formatAmount = (amount = 0) => amount.toFixed(2);
 export default function LedgerPage() {
   const [customerId, setCustomerId] = useState("");
   const [customer, setCustomer] = useState(null);
-  const [invoices, setInvoices] = useState([]);
-  const [vouchers, setVouchers] = useState([]);
+  const [ledgers, setLedgers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -25,16 +24,12 @@ export default function LedgerPage() {
     const fetchLedger = async () => {
       try {
         setLoading(true);
-        const invRes = await fetch(`/api/ledger?customerId=${customerId}`);
-        if (!invRes.ok) throw new Error("Failed to fetch ledger invoices.");
-        const invData = await invRes.json();
+        const res = await fetch(`/api/ledger?customerId=${customerId}`);
+        if (!res.ok) throw new Error("Failed to fetch ledger data.");
+        const data = await res.json();
 
-        const vouRes = await fetch(`/api/ledger-voucher?customerId=${customerId}`);
-        const vouData = vouRes.ok ? await vouRes.json() : [];
-
-        setCustomer(invData.customer || null);
-        setInvoices(invData.invoices || []);
-        setVouchers(vouData.vouchers || []);
+        setCustomer(data.customer || null);
+        setLedgers(data.ledgers || []);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -74,93 +69,26 @@ export default function LedgerPage() {
   if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
 
   // ------------------------
-  // 🧾 Process Invoices
+  // 🧾 Process Ledgers (single source)
   // ------------------------
-  const processedInvoices = invoices.map((invoice) => ({
-    date: invoice.date,
-    customerName: invoice.customer?.name || customer?.name,
+  const processedEntries = ledgers.map((entry) => ({
+    date: entry.date,
+    customerName: entry.customerName || "Unknown",
     entries: [
       {
-        description: `BY Invoice No. ${invoice.invoiceNo || "N/A"}`,
-        debit: invoice.finalAmount || 0,
-        credit: 0,
+        description: entry.narration || `Transaction with ${entry.account || ""}`,
+        debit: entry.debit || 0,
+        credit: entry.credit || 0,
       },
     ],
-    totalDebit: invoice.finalAmount || 0,
-    totalCredit: 0,
+    totalDebit: entry.debit || 0,
+    totalCredit: entry.credit || 0,
   }));
 
   // ------------------------
-  // 💰 Process Vouchers
+  // Apply Date Filter
   // ------------------------
-  const processedVouchers = [];
-
-  vouchers.forEach((voucher) => {
-    const acName = voucher.acName || "";
-    const date = voucher.date;
-    const paymentType = voucher.paymentType?.toUpperCase() || "";
-
-    voucher.customers?.forEach((cust) => {
-      const custId = cust.custId?.toString();
-      const custName = cust.name || "Customer";
-
-      // Specific customer ledger
-      if (customerId && customerId !== "0" && custId === customerId) {
-        processedVouchers.push({
-          date,
-          customerName: custName,
-          entries: [
-            {
-              description: `BY ${acName}`,
-              debit: cust.debit || 0,
-              credit: cust.credit || 0,
-            },
-          ],
-          totalDebit: cust.debit || 0,
-          totalCredit: cust.credit || 0,
-        });
-      }
-
-      // All Accounts view
-      if (customerId === "0") {
-        processedVouchers.push({
-          date,
-          customerName: custName,
-          entries: [
-            {
-              description: `${custName} (${acName})`,
-              debit: cust.debit || 0,
-              credit: cust.credit || 0,
-            },
-          ],
-          totalDebit: cust.debit || 0,
-          totalCredit: cust.credit || 0,
-        });
-      }
-
-      // Cash/Bank Ledger view
-      if (customer?.name && customer.name.toLowerCase() === acName.toLowerCase()) {
-        processedVouchers.push({
-          date,
-          customerName: custName,
-          entries: [
-            {
-              description: `TO ${custName}`,
-              debit: cust.debit || 0,
-              credit: cust.credit || 0,
-            },
-          ],
-          totalDebit: cust.debit || 0,
-          totalCredit: cust.credit || 0,
-        });
-      }
-    });
-  });
-
-  // ------------------------
-  // Combine & Apply Date Filter
-  // ------------------------
-  const allEntries = filterByDate([...processedInvoices, ...processedVouchers]);
+  const allEntries = filterByDate(processedEntries);
 
   // Group by customer
   const groupedByCustomer = allEntries.reduce((acc, entry) => {
@@ -272,7 +200,7 @@ export default function LedgerPage() {
           })
         ) : (
           <div className="text-center text-gray-500 italic py-8">
-            No invoices or vouchers found for this customer within the selected date range.
+            No ledger entries found for this customer within the selected date range.
           </div>
         )}
       </div>

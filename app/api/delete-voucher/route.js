@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
-import Voucher from '../../../models/voucherModel';
-import Ledger from '../../../models/ledgerModel';
-import Customer from '../../../models/custModel';
+import Voucher from "../../../models/voucherModel";
+import Ledger from "../../../models/ledgerModel";
+import Customer from "../../../models/custModel";
 
 export async function POST(req) {
   try {
@@ -12,60 +12,63 @@ export async function POST(req) {
     const id = url.searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "Id missing in query." }, { status: 400 });
+      return NextResponse.json({ error: "Voucher ID missing" }, { status: 400 });
     }
 
-    // Fetch voucher before deletion for rollback
+    // 1️⃣ Fetch voucher before deletion
     const voucher = await Voucher.findById(id);
     if (!voucher) {
-      return NextResponse.json({ error: "Voucher not found." }, { status: 404 });
+      return NextResponse.json({ error: "Voucher not found" }, { status: 404 });
     }
 
     const { acName, customers } = voucher;
 
-    let totalAmount = 0;
-
+    // 2️⃣ Rollback balances (reverse what was done originally)
     for (const entry of customers) {
       const { name, debit = 0, credit = 0 } = entry;
       const amount = debit || credit;
-      totalAmount += amount;
 
-      // Rollback customer balance
-      await Customer.findOneAndUpdate(
-        { name },
-        { $inc: { lastBal: -amount } }
-      );
-
-      // Remove ledger entries for this customer related to the voucher
-      await Ledger.deleteMany({
-        account: name,
-        voucherId: voucher._id,
-      });
+      // Reverse balance change
+      if (debit > 0) {
+        // Originally customer was debited → reduce that now
+        await Customer.findOneAndUpdate(
+          { name },
+          { $inc: { lastBal: -amount } }
+        );
+        await Customer.findOneAndUpdate(
+          { name: acName },
+          { $inc: { lastBal: +amount } }
+        );
+      } else if (credit > 0) {
+        // Originally customer was credited → reverse that now
+        await Customer.findOneAndUpdate(
+          { name },
+          { $inc: { lastBal: +amount } }
+        );
+        await Customer.findOneAndUpdate(
+          { name: acName },
+          { $inc: { lastBal: -amount } }
+        );
+      }
     }
 
-    // Rollback payer (acName) balance
-    await Customer.findOneAndUpdate(
-      { name: acName },
-      { $inc: { lastBal: +totalAmount } }
-    );
+    // 3️⃣ Delete related ledger entries
+    await Ledger.deleteMany({ voucherId: id });
 
-    // Remove ledger entries for payer account (cash/bank)
-    await Ledger.deleteMany({
-      account: acName,
-      voucherId: voucher._id,
-    });
-
-    // Now delete the actual voucher
+    // 4️⃣ Delete voucher itself
     const deletedVoucher = await Voucher.findByIdAndDelete(id);
 
     return NextResponse.json({
-      message: "Voucher and ledger entries deleted successfully",
       success: true,
+      message: "Voucher and related ledger entries deleted successfully.",
       deletedVoucher,
     });
 
   } catch (error) {
-    console.error("Delete Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Delete Voucher Error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
   }
 }

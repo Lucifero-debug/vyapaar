@@ -250,6 +250,7 @@ case 'HSN':
     const result = await response.json();
     if (result.success) {
       console.log('✅ Deleted successfully');
+      window.location.reload();
       // Optional: Reload or update UI
     } else {
       console.error('❌ Failed to delete:', result.error);
@@ -766,14 +767,14 @@ case 'HSN':
                     <CommandGroup>
                       {getEntities().map((entity) => {
                         const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: alterState === 'Bank' || alterState=='Cash'?entity.id: entity.invoiceNo;
-                        const value=entity.name
+                        const values=entity.name;
                         return (
                           <CommandItem
                             key={key}
                             value={String(key)}
                             onSelect={(currentValue) => handleSelect(currentValue)}
                           >
-                            {value}
+                            {values}
                             <Check className={cn('ml-auto', value === key ? 'opacity-100' : 'opacity-0')} />
                           </CommandItem>
                         );
@@ -826,27 +827,27 @@ case 'HSN':
                     <CommandEmpty>No result found.</CommandEmpty>
                    <CommandGroup>
   {getEntitiey().map((entity) => {
-   let key, id;
+   let keys, id;
 
 if (
   deleteState === 'Customer' ||
   deleteState === 'Item'
 ) {
-  key = entity.name;
+  keys = entity.name;
   id = entity.id;
 } else if (deleteState === 'HSN') {
-  key = entity.hsncode;
+  keys = entity.hsncode;
   id = entity.id;
 }else if (
   deleteState === 'Bank' ||
   deleteState === 'Cash'
 ) {
-  key = entity.name;
+  keys = entity.name;
   id = entity.id;
 }
 
 else {
-  key = entity.invoiceNo;
+  keys = entity.invoiceNo;
   id = entity.invoiceNo;
 }
 
@@ -857,8 +858,8 @@ else {
         value={String(id)}
         onSelect={() => handleDelete(id)}
       >
-        {key}
-        <Check className={cn('ml-auto', value === key ? 'opacity-100' : 'opacity-0')} />
+        {keys}
+        <Check className={cn('ml-auto', value === keys ? 'opacity-100' : 'opacity-0')} />
       </CommandItem>
     );
   })}

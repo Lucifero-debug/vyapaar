@@ -258,7 +258,7 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
           <td className="py-3 px-4 text-right">₹{item.cost.toFixed(2)}</td>
           <td className="py-3 px-4 text-right">{item.discount.toFixed(2)}%</td>
           <td className="py-3 px-4 text-right">{item.hsn}</td>
-          <td className="py-3 px-4 text-right">{item.gst}%</td>
+          <td className="py-3 px-4 text-right">{item.gstRate || 0}%</td>
           <td className="py-3 px-4 text-right font-semibold">₹{item.total.toFixed(2)}</td>
         </tr>
         {item.description && (
