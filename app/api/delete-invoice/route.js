@@ -4,6 +4,7 @@ import { connect } from "../../../lib/mongodb";
 import Invoice from "../../../models/invoiceModel";
 import Customer from "../../../models/custModel";
 import Ledger from "../../../models/ledgerModel";
+import ItemLedger from "../../../models/itemLedgerModel";
 
 export async function POST(req) {
   try {
@@ -36,6 +37,11 @@ export async function POST(req) {
     const deleteResult = await Ledger.deleteMany({ $or: query });
 
     console.log("🧾 Ledger delete result:", deleteResult);
+
+        const deleteItemLedgerResult = await ItemLedger.deleteMany({
+      invoiceNo: Number(invoiceNo),
+    });
+    console.log("📦 ItemLedger delete result:", deleteItemLedgerResult);
 
     // === Update Customer Balance ===
     const customer = await Customer.findOne({ name: deletedInvoice.customer.name });

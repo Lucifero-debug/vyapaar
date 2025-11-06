@@ -4,6 +4,8 @@ import { getNextInvoiceNo } from "@/lib/getNextInvoiceNo";
 import Customer from "../../../models/custModel";
 import Ledger from "../../../models/ledgerModel";
 import { connect } from "../../../lib/mongodb";
+import ItemLedger from "../../../models/itemLedgerModel";
+
 
 export async function POST(req) {
   try {
@@ -63,6 +65,48 @@ export async function POST(req) {
     };
 
     await Ledger.create(ledgerEntry);
+
+const existingEntries = await ItemLedger.find({ invoiceNo: newInvoice.invoiceNo });
+if (existingEntries.length === 0) {
+if (body.items && Array.isArray(body.items)) {
+  let newBalance=0;
+  for (const item of body.items) {
+    const receiptQty =
+      body.type === "Purchase" || body.returnType === "SaleReturn"
+        ? item.quantity
+        : 0;
+    const issueQty =
+      body.type === "Sale" || body.returnType === "PurchaseReturn"
+        ? item.quantity
+        : 0;
+
+    // find previous item ledger balance
+    const lastEntry = await ItemLedger.findOne({ itemName: item.name }).sort({
+      date: -1,
+    });
+
+
+
+ newBalance = newBalance+receiptQty - issueQty;
+
+await ItemLedger.create({
+  date: newInvoice.date || new Date(),
+  invoiceNo: newInvoice.invoiceNo || invoice,
+  typeOfVoucher: body.type,
+  partyName: body.customer.name,
+  receiptQuantity: receiptQty,
+  issueQuantity: issueQty,
+  balanceQuantity: newBalance,
+  itemName: item.name,
+});
+
+  }
+}
+
+}
+
+    // 6️⃣ Create Item Ledger Entries
+
 
     return NextResponse.json({
       success: true,

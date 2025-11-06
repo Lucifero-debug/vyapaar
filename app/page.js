@@ -124,15 +124,19 @@ console.log("Fetched Cash:", cash);
         const saleInv = invoices.filter(inv => inv.type === 'Sale' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
             totalAmount: inv.totalAmount || 0,
+            customer:inv.customer.name
         }));
         const purchaseInv = invoices.filter(inv => inv.type === 'Purchase' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
+           customer:inv.customer.name
         }));
         const saleRet = invoices.filter(inv => inv.type === 'Sale' && inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
+           customer:inv.customer.name
         }));
         const purchaseRet = invoices.filter(inv => inv.type === 'Purchase' && inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
+           customer:inv.customer.name
         }));
          const totalSales = saleInv.reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) || 0), 0);
 setTotalSalesAmount(totalSales);
@@ -158,7 +162,7 @@ setTotalSalesAmount(totalSales);
   }
 }, [alter, del]);
 
-
+console.log("Jaat",saleInvoices)
   const handleSelect = (currentValue) => {
     console.log('handleSelect triggered with value:', currentValue);
     const newValue = currentValue;
@@ -733,6 +737,97 @@ case 'HSN':
 
         </Accordion>
 
+    <Accordion type="single" collapsible>
+      <AccordionItem value="itemLedger" className="bg-gray-50 rounded-lg">
+        <AccordionTrigger className="px-4 py-3 text-lg font-semibold">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="32"
+            height="32"
+            fill="none"
+            viewBox="0 0 32 32"
+          >
+            <path
+              fill="#212121"
+              d="M12 8C11.4477 8 11 8.44772 11 9V11C11 11.5523 11.4477 12 12 12H20C20.5523 12 21 11.5523 21 11V9C21 8.44772 20.5523 8 20 8H12Z"
+            ></path>
+            <path
+              fill="#212121"
+              d="M4 3C4 1.89543 4.89543 1 6 1H27C28.1046 1 29 1.89543 29 3V28C29 29.1046 28.1046 30 27 30H6C4.89543 30 4 29.1046 4 28V24.7391C3.09792 24.1616 2.5 23.1506 2.5 22C2.5 20.9218 3.02505 19.9662 3.83341 19.375C3.02505 18.7838 2.5 17.8282 2.5 16.75C2.5 15.6718 3.02505 14.7162 3.83341 14.125C3.02505 13.5338 2.5 12.5782 2.5 11.5C2.5 10.4218 3.02505 9.46622 3.83341 8.875C3.02505 8.28378 2.5 7.32821 2.5 6.25C2.5 5.0994 3.09792 4.08844 4 3.51091V3Z"
+            ></path>
+          </svg>
+          Item Ledger
+        </AccordionTrigger>
+
+        <AccordionContent className="bg-white px-4 py-4">
+          <div className="flex justify-center">
+            {loading ? (
+              <p>Loading items...</p>
+            ) : (
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[250px] justify-between">
+                    {value
+                      ? item.find((item) => item.id === value)?.name
+                      : "Select Item"}
+                    <ChevronsUpDown className="opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent className="w-[250px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search Item..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No items found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          key="all"
+                          value="0"
+                          onSelect={() => {
+                            setValue("0");
+                            setOpen(false);
+                            router.push(`/item-ledger?itemId=0`);
+                          }}
+                        >
+                          📦 All Items
+                          <Check
+                            className={cn(
+                              "ml-auto",
+                              value === "0" ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+
+                        {item.map((item) => (
+                          <CommandItem
+                            key={item.id}
+                            value={String(item.id)}
+                            onSelect={() => {
+                              setValue(item.id);
+                              setOpen(false);
+                              router.push(`/item-ledger?itemId=${item.id}`);
+                            }}
+                          >
+                            {item.name}
+                            <Check
+                              className={cn(
+                                "ml-auto",
+                                value === item.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+
         
 
         <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/setup')}>
@@ -767,7 +862,17 @@ case 'HSN':
                     <CommandGroup>
                       {getEntities().map((entity) => {
                         const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: alterState === 'Bank' || alterState=='Cash'?entity.id: entity.invoiceNo;
-                        const values=entity.name;
+                       const values =
+  alterState === 'Customer' || alterState === 'Item'
+    ? entity.name
+    : alterState === 'HSN'
+    ? entity.hsncode
+    : alterState === 'SaleInvoice' || alterState === 'PurchaseInvoice'||alterState === 'SaleReturn' || alterState === 'PurchaseReturn'  
+    ? entity.customer
+    : alterState === 'Bank' || alterState === 'Cash'
+    ? entity.name || entity.id
+    : entity.invoiceNo;
+
                         return (
                           <CommandItem
                             key={key}
@@ -847,7 +952,7 @@ if (
 }
 
 else {
-  keys = entity.invoiceNo;
+  keys = entity.customer;
   id = entity.invoiceNo;
 }
 

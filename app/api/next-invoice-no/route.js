@@ -11,7 +11,7 @@ export async function GET() {
       { name: 'invoiceNo' },
     );
 
-    return NextResponse.json({ invoiceNo: counter.value });
+    return NextResponse.json({ invoiceNo: counter.value+1 });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

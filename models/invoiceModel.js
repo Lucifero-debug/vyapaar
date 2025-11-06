@@ -19,7 +19,7 @@ const partyTaxSchema = new mongoose.Schema({
 
 const invoiceSchema = new mongoose.Schema(
   {
-    invoiceNo: { type: Number, required: true },
+    invoiceNo: { type: Number, required: true,unique:true },
     againstInvoiceNo: { type: Number },
     date: { type: Date, required: true },
     
