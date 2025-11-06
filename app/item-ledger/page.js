@@ -25,7 +25,6 @@ export default function ItemLedgerPage() {
         const res = await fetch(`/api/item-ledger?itemId=${itemId}`);
         if (!res.ok) throw new Error("Failed to fetch item ledger data.");
         const data = await res.json();
-        console.log("maharani", data);
         setItem(data.item || null);
         setLedgers(data.ledgers || []);
       } catch (err) {
@@ -51,7 +50,7 @@ export default function ItemLedgerPage() {
     });
   };
 
-  // 🟢 Group entries by item name
+  // Group entries by item name
   const groupByItemName = (data) => {
     return data.reduce((acc, entry) => {
       const itemName = entry.itemName || "Unknown Item";
@@ -75,7 +74,7 @@ export default function ItemLedgerPage() {
   if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
 
   const filteredEntries = filterByDate(ledgers);
-  const groupedItems = groupByItemName(filteredEntries); // 🟢 Group items
+  const groupedItems = groupByItemName(filteredEntries);
 
   // ==========================
   // 🧮 Render
@@ -120,53 +119,89 @@ export default function ItemLedgerPage() {
           </div>
         </div>
 
-        {/* 🟢 Multiple Item Tables */}
+        {/* Multiple Item Tables */}
         {Object.entries(groupedItems).length > 0 ? (
-          Object.entries(groupedItems).map(([itemName, entries], idx) => (
-            <div key={idx} className="mb-10 bg-white border border-gray-300 rounded-xl shadow-sm">
-              <div className="bg-blue-50 border-b border-gray-300 px-4 py-3 flex justify-between">
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {itemName.toUpperCase()}
-                </h3>
-                <span className="text-sm text-gray-500">({entries.length} Entries)</span>
-              </div>
+          Object.entries(groupedItems).map(([itemName, entries], idx) => {
+            // 🧮 Compute totals
+            const totalReceipt = entries.reduce(
+              (sum, e) => sum + (e.receiptQuantity || 0),
+              0
+            );
+            const totalIssue = entries.reduce(
+              (sum, e) => sum + (e.issueQuantity || 0),
+              0
+            );
+            const finalBalance =
+              entries.length > 0
+                ? entries[entries.length - 1].balanceQuantity
+                : 0;
 
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 border-b border-gray-300">
-                    <th className="px-3 py-2 text-left w-[10%]">DATE</th>
-                    <th className="px-3 py-2 text-left w-[10%]">INVOICE NO.</th>
-                    <th className="px-3 py-2 text-left w-[15%]">TYPE OF VOUCHER</th>
-                    <th className="px-3 py-2 text-left w-[25%]">PARTY NAME</th>
-                    <th className="px-3 py-2 text-right w-[10%]">RECEIPT QTY</th>
-                    <th className="px-3 py-2 text-right w-[10%]">ISSUE QTY</th>
-                    <th className="px-3 py-2 text-right w-[10%]">BALANCE QTY</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry, i) => (
-                    <tr key={i} className="border-b border-gray-200">
-                      <td className="px-3 py-2 text-gray-700">
-                        {entry.date ? new Date(entry.date).toLocaleDateString("en-IN") : "N/A"}
+            return (
+              <div key={idx} className="mb-10 bg-white border border-gray-300 rounded-xl shadow-sm">
+                {/* Item Header */}
+                <div className="bg-blue-50 border-b border-gray-300 px-4 py-3 flex justify-between">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    {itemName.toUpperCase()}
+                  </h3>
+                  <span className="text-sm text-gray-500">({entries.length} Entries)</span>
+                </div>
+
+                {/* Table */}
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b border-gray-300">
+                      <th className="px-3 py-2 text-left w-[10%]">DATE</th>
+                      <th className="px-3 py-2 text-left w-[10%]">INVOICE NO.</th>
+                      <th className="px-3 py-2 text-left w-[15%]">TYPE OF VOUCHER</th>
+                      <th className="px-3 py-2 text-left w-[25%]">PARTY NAME</th>
+                      <th className="px-3 py-2 text-right w-[10%]">RECEIPT QTY</th>
+                      <th className="px-3 py-2 text-right w-[10%]">ISSUE QTY</th>
+                      <th className="px-3 py-2 text-right w-[10%]">BALANCE QTY</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry, i) => (
+                      <tr key={i} className="border-b border-gray-200">
+                        <td className="px-3 py-2 text-gray-700">
+                          {entry.date ? new Date(entry.date).toLocaleDateString("en-IN") : "N/A"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">{entry.invoiceNo || "-"}</td>
+                        <td className="px-3 py-2 text-gray-700">{entry.typeOfVoucher}</td>
+                        <td className="px-3 py-2 text-gray-700">{entry.partyName}</td>
+                        <td className="px-3 py-2 text-right text-green-700">
+                          {entry.receiptQuantity ? formatQty(entry.receiptQuantity) : ""}
+                        </td>
+                        <td className="px-3 py-2 text-right text-red-700">
+                          {entry.issueQuantity ? formatQty(entry.issueQuantity) : ""}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-gray-800">
+                          {formatQty(entry.balanceQuantity)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+
+                  {/* 🟢 TOTAL ROW */}
+                  <tfoot>
+                    <tr className="font-bold bg-gray-100 border-t border-gray-300">
+                      <td colSpan="4" className="px-3 py-2 text-right">
+                        TOTAL:
                       </td>
-                      <td className="px-3 py-2 text-gray-700">{entry.invoiceNo || "-"}</td>
-                      <td className="px-3 py-2 text-gray-700">{entry.typeOfVoucher}</td>
-                      <td className="px-3 py-2 text-gray-700">{entry.partyName}</td>
                       <td className="px-3 py-2 text-right text-green-700">
-                        {entry.receiptQuantity ? formatQty(entry.receiptQuantity) : ""}
+                        {formatQty(totalReceipt)}
                       </td>
                       <td className="px-3 py-2 text-right text-red-700">
-                        {entry.issueQuantity ? formatQty(entry.issueQuantity) : ""}
+                        {formatQty(totalIssue)}
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold text-gray-800">
-                        {formatQty(entry.balanceQuantity)}
+                      <td className="px-3 py-2 text-right text-gray-800">
+                        {formatQty(finalBalance)}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))
+                  </tfoot>
+                </table>
+              </div>
+            );
+          })
         ) : (
           <div className="text-center text-gray-500 italic py-8">
             No item ledger entries found for this item within the selected date range.

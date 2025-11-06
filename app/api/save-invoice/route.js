@@ -69,7 +69,6 @@ export async function POST(req) {
 const existingEntries = await ItemLedger.find({ invoiceNo: newInvoice.invoiceNo });
 if (existingEntries.length === 0) {
 if (body.items && Array.isArray(body.items)) {
-  let newBalance=0;
   for (const item of body.items) {
     const receiptQty =
       body.type === "Purchase" || body.returnType === "SaleReturn"
@@ -81,13 +80,15 @@ if (body.items && Array.isArray(body.items)) {
         : 0;
 
     // find previous item ledger balance
-    const lastEntry = await ItemLedger.findOne({ itemName: item.name }).sort({
-      date: -1,
-    });
+  const lastEntry = await ItemLedger.findOne({ itemName: item.name })
+    .sort({ date: -1 })
+    .lean();
 
+  const prevBalance = lastEntry ? lastEntry.balanceQuantity : 0;
 
-
- newBalance = newBalance+receiptQty - issueQty;
+  // 🟢 SIGFA-style logic:
+  // new balance = previous balance + receipts - issues
+  const newBalance = prevBalance + receiptQty - issueQty;
 
 await ItemLedger.create({
   date: newInvoice.date || new Date(),
