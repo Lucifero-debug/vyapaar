@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import React, { Suspense, useEffect, useState } from "react";
 import LedgerSearchParams from "../../components/LedgerSuspense";
 
-const formatAmount = (amount = 0) => amount.toFixed(2);
+const formatAmount = (amount = 0) => parseFloat(amount).toFixed(2);
 
 export default function LedgerPage() {
   const [customerId, setCustomerId] = useState("");
@@ -69,29 +69,14 @@ export default function LedgerPage() {
   if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
 
   // ------------------------
-  // 🧾 Process Ledgers (single source)
+  // 🧾 Process Ledgers
   // ------------------------
-  const processedEntries = ledgers.map((entry) => ({
-    date: entry.date,
-    customerName: entry.customerName || "Unknown",
-    entries: [
-      {
-        description: entry.narration || `Transaction with ${entry.account || ""}`,
-        debit: entry.debit || 0,
-        credit: entry.credit || 0,
-      },
-    ],
-    totalDebit: entry.debit || 0,
-    totalCredit: entry.credit || 0,
-  }));
+  const filteredEntries = filterByDate(ledgers).sort(
+    (a, b) => new Date(a.date) - new Date(b.date)
+  );
 
-  // ------------------------
-  // Apply Date Filter
-  // ------------------------
-  const allEntries = filterByDate(processedEntries);
-
-  // Group by customer
-  const groupedByCustomer = allEntries.reduce((acc, entry) => {
+  // Group by customer name
+  const groupedByCustomer = filteredEntries.reduce((acc, entry) => {
     const cust = entry.customerName || "Unknown";
     if (!acc[cust]) acc[cust] = [];
     acc[cust].push(entry);
@@ -144,15 +129,31 @@ export default function LedgerPage() {
         {/* Ledgers */}
         {Object.entries(groupedByCustomer).length > 0 ? (
           Object.entries(groupedByCustomer).map(([custName, entries], idx) => {
-            const totalDebit = entries.reduce((sum, e) => sum + e.totalDebit, 0);
-            const totalCredit = entries.reduce((sum, e) => sum + e.totalCredit, 0);
+            let runningBalance = 0;
+            let totalDebit = 0;
+            let totalCredit = 0;
+
+            const computedEntries = entries.map((e) => {
+              const debit = e.debit || 0;
+              const credit = e.credit || 0;
+              runningBalance += debit - credit;
+              totalDebit += debit;
+              totalCredit += credit;
+
+              return {
+                date: e.date,
+                description: e.narration || `Transaction with ${e.account || ""}`,
+                debit,
+                credit,
+                balance: Math.abs(runningBalance),
+                mode: runningBalance >= 0 ? "Dr" : "Cr",
+              };
+            });
 
             return (
               <div key={idx} className="mb-10 bg-white border border-gray-300 rounded-xl shadow-sm">
                 <div className="bg-blue-50 border-b border-gray-300 px-4 py-3 flex justify-between">
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {custName.toUpperCase()}
-                  </h3>
+                  <h3 className="text-lg font-semibold text-gray-800">{custName.toUpperCase()}</h3>
                   <span className="text-sm text-gray-500">({entries.length} Entries)</span>
                 </div>
 
@@ -160,27 +161,27 @@ export default function LedgerPage() {
                   <thead>
                     <tr className="bg-gray-100 border-b border-gray-300">
                       <th className="px-3 py-2 text-left w-[15%]">DATE</th>
-                      <th className="px-3 py-2 text-left w-[55%]">DESCRIPTION</th>
-                      <th className="px-3 py-2 text-right w-[15%]">DEBIT</th>
-                      <th className="px-3 py-2 text-right w-[15%]">CREDIT</th>
+                      <th className="px-3 py-2 text-left w-[45%]">DESCRIPTION</th>
+                      <th className="px-3 py-2 text-right w-[10%]">DEBIT</th>
+                      <th className="px-3 py-2 text-right w-[10%]">CREDIT</th>
+                      <th className="px-3 py-2 text-right w-[20%]">BALANCE</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {entries.map((block, i) => (
+                    {computedEntries.map((entry, i) => (
                       <tr key={i} className="border-b border-gray-200">
                         <td className="px-3 py-2 text-gray-700">
-                          {block.date ? new Date(block.date).toLocaleDateString("en-IN") : "N/A"}
+                          {entry.date ? new Date(entry.date).toLocaleDateString("en-IN") : "N/A"}
                         </td>
-                        <td className="px-3 py-2 text-gray-700">
-                          {block.entries.map((entry, j) => (
-                            <div key={j}>{entry.description}</div>
-                          ))}
+                        <td className="px-3 py-2 text-gray-700">{entry.description}</td>
+                        <td className="px-3 py-2 text-right text-green-700">
+                          {entry.debit ? formatAmount(entry.debit) : ""}
                         </td>
-                        <td className="px-3 py-2 text-right text-gray-800">
-                          {block.totalDebit ? formatAmount(block.totalDebit) : ""}
+                        <td className="px-3 py-2 text-right text-red-700">
+                          {entry.credit ? formatAmount(entry.credit) : ""}
                         </td>
-                        <td className="px-3 py-2 text-right text-gray-800">
-                          {block.totalCredit ? formatAmount(block.totalCredit) : ""}
+                        <td className="px-3 py-2 text-right font-semibold text-gray-800">
+                          {formatAmount(entry.balance)} {entry.mode}
                         </td>
                       </tr>
                     ))}
@@ -192,6 +193,10 @@ export default function LedgerPage() {
                       </td>
                       <td className="px-3 py-2 text-right">{formatAmount(totalDebit)}</td>
                       <td className="px-3 py-2 text-right">{formatAmount(totalCredit)}</td>
+                      <td className="px-3 py-2 text-right">
+                        {formatAmount(Math.abs(runningBalance))}{" "}
+                        {runningBalance >= 0 ? "Dr" : "Cr"}
+                      </td>
                     </tr>
                   </tfoot>
                 </table>
