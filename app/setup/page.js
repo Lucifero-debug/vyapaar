@@ -17,7 +17,8 @@ const Page = () => {
     description: 'Description for Products',
     shipped: 'Shipped To',
     dispatch: 'Dispatch From',
-    calculateByPack: 'Enable Quantity = Per Pack × No. of Packs', // ✅ NEW LABEL
+    calculateByPack: 'Enable Quantity = Per Pack × No. of Packs', 
+     rollStationary: 'Use Roll Stationary Invoice Format',
   };
 
   return (

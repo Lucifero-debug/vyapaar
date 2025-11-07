@@ -72,12 +72,13 @@ const [noOfPack, setNoOfPack] = useState(0);
 
 useEffect(() => {
   const fetchInvoiceNo = async () => {
-    if (!value&&isValueReady) { // Only fetch if not editing an existing invoice
+    if (!value) {
       try {
         const response = await fetch('/api/next-invoice-no');
         const data = await response.json();
         if (data.invoiceNo) {
           setInvoiceNo(data.invoiceNo);
+          console.log("ronak",invoiceNo)
           localStorage.setItem('invoiceNo', data.invoiceNo);
         }
       } catch (err) {
@@ -88,6 +89,7 @@ useEffect(() => {
 
   fetchInvoiceNo();
 }, [value]);
+
 
     // Load existing invoice data if value parameter exists
     useEffect(() => {

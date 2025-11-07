@@ -4,9 +4,12 @@ import AddIcCallOutlinedIcon from '@mui/icons-material/AddIcCallOutlined';
 import { useSearchParams } from 'next/navigation';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { useSaleOptions } from '@/context/SaleOptionContext';
 
 const PageContent = () => {
 
+    const { options } = useSaleOptions();
+  const isRollStationary = options.rollStationary;
   const searchParams = useSearchParams();
   const contentRef = useRef();
 const generatePDF = async (contentRef) => {
@@ -133,11 +136,16 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
 
   return (
     <>
-      <div 
-        ref={contentRef} 
-        className="max-w-3xl mx-auto bg-white p-8 border border-gray-300 rounded-md shadow-sm text-gray-900 font-sans"
-        style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
-      >
+<div 
+  ref={contentRef} 
+  className={`mx-auto bg-white border border-gray-300 rounded-md shadow-sm text-gray-900 font-sans transition-all duration-300
+    ${isRollStationary ? 'max-w-[480px] p-3 text-[12px]' : 'max-w-3xl p-8 text-[14px]'}`}
+  style={{
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    overflow: "hidden",
+  }}
+>
+
         {/* Header */}
         <header className="mb-8 flex justify-between items-center">
      <div className="flex items-center gap-4">
@@ -238,7 +246,16 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
 
 
         {/* Items Table */}
-        <table className="w-full border-collapse mb-6">
+<table
+  className={`border-collapse mb-6 w-full ${
+    isRollStationary ? 'text-[11px]' : 'text-sm'
+  }`}
+  style={{
+    tableLayout: "fixed", // ✅ Ensures proper column wrapping
+    wordBreak: "break-word",
+  }}
+>
+
           <thead>
             <tr className="bg-gray-100 border-b border-gray-300">
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">Item</th>
@@ -283,7 +300,16 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
       HSN Code-wise Summary
     </h2>
     <div className="flex justify-start">
-      <table className="text-sm border border-gray-300 w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
+<table
+  className={`border border-gray-300 w-full ${
+    isRollStationary ? 'text-[11px]' : 'text-sm'
+  }`}
+  style={{
+    tableLayout: "fixed",
+    wordBreak: "break-word",
+  }}
+>
+
         <thead className="bg-gray-100">
           <tr>
             <th className="py-2 px-4 text-left border-b border-gray-300">HSN Code</th>
@@ -323,7 +349,7 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
     <h3 className="text-md font-semibold text-gray-700 mb-2">Additional Overhead:</h3>
     {partyTaxes.map((tax, idx) => (
       <div key={idx} className="text-sm text-gray-600 flex justify-between">
-        <span>{tax.name} ({tax.rate ? `${tax.rate}%` : `₹${tax.amount}`}):</span>
+        <span>{tax.name} ({tax.rate ? `${tax.rate}%` : `₹${tax.total}`}):</span>
         <span>₹{parseFloat(tax.total).toFixed(2)}</span>
       </div>
     ))}

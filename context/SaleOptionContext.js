@@ -10,6 +10,7 @@ export const SaleOptionProvider = ({ children }) => {
     shipped: false,
     dispatch: false,
      calculateByPack: false,
+      rollStationary: false, 
   });
 
   useEffect(() => {
