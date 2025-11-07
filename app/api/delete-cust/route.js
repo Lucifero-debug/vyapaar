@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
 import Customer from "@/models/custModel";
+import Invoice from "../../../models/invoiceModel";
 
 export async function POST(req) {
   try {
@@ -11,6 +12,19 @@ export async function POST(req) {
 
     if (!id) {
       return NextResponse.json({ error: "Id missing in query." }, { status: 400 });
+    }
+
+        const existingInvoice = await Invoice.findOne({ "customer.custId": id });
+
+    if (existingInvoice) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Customer cannot be deleted because invoices exist for this customer.",
+          invoiceNo: existingInvoice.invoiceNo,
+        },
+        { status: 409 } // Conflict
+      );
     }
 
     const deletedCust = await Customer.findByIdAndDelete(id);

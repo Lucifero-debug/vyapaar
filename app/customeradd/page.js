@@ -21,6 +21,8 @@ const PageContent = () => {
   const [short, setShort] = useState('');
   const [group, setGroup] = useState('');
   const [openBal, setOpenBal] = useState(0);
+  const [openingMode,setOpeningMode] = useState('')
+  const [lastMode,setLastMode] = useState('')
   const [lastBal, setLastBal] = useState(0);
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState(0);
@@ -67,6 +69,8 @@ const PageContent = () => {
           setInterest(d.interest || 0);
           setDiscount(d.discount || 0);
           setDealerType(d.dealerType || '')
+          setOpeningMode(d.openingMode || '');
+          setLastMode(d.lastMode || '')
         })
         .catch(error => console.error('Error fetching customer data:', error));
     }
@@ -76,7 +80,7 @@ const PageContent = () => {
     const customerData = {
       id: id || undefined,
       name, short, group, openBal, lastBal, address, pincode, phone,
-      city, state, gstIn, stateCode, email, aadhar, pan, bank, interest, discount
+      city, state, gstIn, stateCode, email, aadhar, pan, bank, interest, discount,openingMode,lastMode
     };
 
     const endpoint = value ? '/api/customer-alter' : '/api/customer-add';
@@ -184,7 +188,15 @@ const PageContent = () => {
               </div>
               <div className="space-y-1">
                 <Label>Dr/Cr</Label>
-                <Input type='number' />
+                    <select
+      value={openingMode}
+      onChange={(e) => setOpeningMode(e.target.value)}
+      className="w-full border rounded-md h-10 px-2 text-gray-700 bg-white"
+    >
+      <option value="">Select</option>
+      <option value="Dr">Debit</option>
+      <option value="Cr">Credit</option>
+    </select>
               </div>
               <div className="space-y-1">
                 <Label>Last Year Balance</Label>
@@ -192,7 +204,15 @@ const PageContent = () => {
               </div>
               <div className="space-y-1">
                 <Label>Dr/Cr</Label>
-                <Input type='number' />
+                    <select
+      value={lastMode}
+      onChange={(e) => setLastMode(e.target.value)}
+      className="w-full border rounded-md h-10 px-2 text-gray-700 bg-white"
+    >
+      <option value="">Select</option>
+      <option value="Dr">Debit</option>
+      <option value="Cr">Credit</option>
+    </select>
               </div>
             </div>
           </CardContent>

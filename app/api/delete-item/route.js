@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
 import Item from "@/models/itemModel";
+import Invoice from "../../../models/invoiceModel";
 
 export async function POST(req) {
   try {
@@ -11,6 +12,19 @@ export async function POST(req) {
 
     if (!id) {
       return NextResponse.json({ error: "Id missing in query." }, { status: 400 });
+    }
+
+        const existingInvoice = await Invoice.findOne({ "items._id": id });
+
+    if (existingInvoice) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Cannot delete item because it is used in invoice #${existingInvoice.invoiceNo}.`,
+          invoiceNo: existingInvoice.invoiceNo,
+        },
+        { status: 409 } // Conflict
+      );
     }
 
     const deletedItem = await Item.findByIdAndDelete(id);

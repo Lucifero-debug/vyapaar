@@ -100,7 +100,8 @@ useEffect(() => {
             .then(res => res.json())
             .then(res => {
                 const data = res.final;
-                console.log(data)
+                console.log("transformer",data)
+  setGst(data.gst || normalizedItems.reduce((sum, i) => sum + (i.gstAmount || 0), 0));
                 setInvoiceNo(data.invoiceNo || 4);
                 setDate(data.date ? formatDate(data.date) : new Date().toISOString().substring(0, 10));
                 setId(data._id);
@@ -234,17 +235,35 @@ setHsnTotals(groupedByHSN);
     }, [])
 
 useEffect(() => {
-  const groupedByHSN = {};
-  selectedItem.forEach(item => {
-    const hsn = item.hsn || "N/A";
-    const baseAmount = (item.cost || 0) * (item.quantity || 0);
-    const discountAmount = ((item.discount || 0) / 100) * baseAmount;
-    const gstAmount = item.gstAmount || 0;
-    const total = baseAmount - discountAmount + gstAmount;
+const groupedByHSN = {};
 
-    groupedByHSN[hsn] = (groupedByHSN[hsn] || 0) + total;
-  });
-  setHsnTotals(groupedByHSN);
+selectedItem.forEach(item => {
+  const hsn = item.hsn || "N/A";
+  const cost = Number(item.cost) || 0;
+  const qty = Number(item.quantity) || 0;
+  const discount = Number(item.discount) || 0;
+  const gstRate = Number(item.gst || item.gstRate || 0);
+
+  const baseAmount = cost * qty;
+  const discountAmount = (baseAmount * discount) / 100;
+  const taxableBase = baseAmount - discountAmount;
+  const gstAmount = (taxableBase * gstRate) / 100;
+  const total = taxableBase + gstAmount;
+
+  if (!groupedByHSN[hsn]) {
+    groupedByHSN[hsn] = {
+      gstRate,
+      gstAmount: 0,   // total GST on that HSN
+      total: 0        // total final amount on that HSN
+    };
+  }
+
+  groupedByHSN[hsn].gstAmount += gstAmount;
+  groupedByHSN[hsn].total += total;
+});
+
+setHsnTotals(groupedByHSN);
+
 }, [selectedItem]); 
 
     // Save invoice function
@@ -253,10 +272,13 @@ useEffect(() => {
         const encodedParty = encodeURIComponent(JSON.stringify(partyTaxes));
        const encodedHsnTotals = encodeURIComponent(JSON.stringify(hsnTotals));
         const phone = selectedCustomer.phone;
-        const hsnTotalsArray = Object.entries(hsnTotals).map(([hsn, amount]) => ({
-          hsn,
-          amount
-        }));
+const hsnTotalsArray = Object.entries(hsnTotals).map(([hsn, data]) => ({
+  hsn,
+  gstRate: data.gstRate,
+  amount: data.gstAmount,
+  total: data.total
+}));
+
         const invoiceData = {
             invoiceNo,
             date,
@@ -408,58 +430,70 @@ useEffect(() => {
         setTaxType(e.target.value);
     };
 
-    const saveItem = (e) => {
-        const selectedName = e.target.value;
-        const selectedItems = item.find((i) => i.name === selectedName);
-         if (!selectedItems) return;
-        if (options.description) {
+const saveItem = (e) => {
+  const selectedName = e.target.value;
+  const selectedItems = item.find((i) => i.name === selectedName);
+  if (!selectedItems) return;
+
+  if (options.description) {
     setShowDescPopup(true);
     return;
   }
-     if (options.calculateByPack) {
-   setShowQuantityPack(true)
+
+  if (options.calculateByPack) {
+    setShowQuantityPack(true);
     return;
   }
 
-        if (selectedItems) {
-          const rateValue = rate || selectedItems.cost;
-  const quantityValue = quantity || 1;
+  const rateValue = Number(rate || selectedItems.cost);
+  const quantityValue = Number(quantity || 1);
+  const discountValue = Number(discount || 0);
+  const gstRate = Number(selectedItems.gst || selectedItems.gstRate || 0);
 
-  const subtotal = rateValue * quantityValue;
-  const gstRate = selectedItems?.gst || 0;
-  const gstAmount = (subtotal * gstRate) / 100;
-  const total = subtotal + gstAmount;
+  const baseAmount = rateValue * quantityValue;
+  const discountAmount = (baseAmount * discountValue) / 100;
+  const taxableAmount = baseAmount - discountAmount;
+  const gstAmount = (taxableAmount * gstRate) / 100;
+  const total = taxableAmount + gstAmount;
 
-
-   const newItem = {
+  const newItem = {
     ...selectedItems,
     quantity: quantityValue,
     cost: rateValue,
-    discount: discount || 0,
-    gstRate,
-    gstAmount,
-    total:total,
+    discount: discountValue,
+    gstRate,               // ✅ store GST Rate
+    taxableAmount,         // ✅ store Taxable (pre-GST)
+    gstAmount,             // ✅ store GST value
+    total,                 // ✅ store Total (taxable + GST)
   };
 
+  const updatedItems = [...selectedItem, newItem];
+  setSelectedItem(updatedItems);
+
+  // Update GST and HSN totals
   let totalGst = 0;
-            const updatedItems = [...selectedItem, newItem];
-            setSelectedItem(updatedItems);
-            const groupedByHSN = {};
-updatedItems.forEach(item => {
-  const hsn = item.hsn || 'N/A';
-   const gstAmount = item.gstAmount || 0;
-    totalGst += gstAmount;
-  groupedByHSN[hsn] = (groupedByHSN[hsn] || 0) + item.total;
-});
-setHsnTotals(groupedByHSN);
-setGst(totalGst);
-}
-console.log("Gst",gst)
-        setItemName('');
-        setQuantity('');
-        setRate('');
-        setDiscount('');
-    };
+  const groupedByHSN = {};
+  updatedItems.forEach(item => {
+    const hsn = item.hsn || 'N/A';
+    totalGst += item.gstAmount || 0;
+
+    if (!groupedByHSN[hsn]) {
+      groupedByHSN[hsn] = { gstRate: item.gstRate, gstAmount: 0, total: 0 };
+    }
+    groupedByHSN[hsn].gstAmount += item.gstAmount || 0;
+    groupedByHSN[hsn].total += item.total || 0;
+  });
+
+  setHsnTotals(groupedByHSN);
+  setGst(totalGst);
+
+  // Reset fields
+  setItemName('');
+  setQuantity('');
+  setRate('');
+  setDiscount('');
+};
+
    const handleSaveDescription = () => {
   const selectedItems = item.find((i) => i.name === itemName);
   if (!selectedItems) return;
@@ -471,6 +505,10 @@ console.log("Gst",gst)
   const gstRate = selectedItems.hsn?.gst || 0;
   const gstAmount = (subtotal * gstRate) / 100;
   const total = subtotal + gstAmount;
+  const discountValue = Number(discount || 0);
+    const baseAmount = rateValue * quantityValue;
+    const discountAmount = (baseAmount * discountValue) / 100;
+  const taxableAmount = subtotal - discountAmount;
 
   const newItem = {
     ...selectedItems,
@@ -479,6 +517,7 @@ console.log("Gst",gst)
     cost: rateValue,
     discount: discount || 0,
     gstRate,
+    taxableAmount,
     gstAmount,
     total,
   };
@@ -521,6 +560,10 @@ setGst(totalGst);
   const gstRate = selectedItems.hsn?.gst || 0;
   const gstAmount = (subtotal * gstRate) / 100;
   const total = subtotal + gstAmount;
+  const discountValue = Number(discount || 0);
+    const baseAmount = rateValue * quantityValue;
+    const discountAmount = (baseAmount * discountValue) / 100;
+  const taxableAmount = subtotal - discountAmount;
 
   const newItem = {
     ...selectedItems,
@@ -529,6 +572,7 @@ setGst(totalGst);
     cost: rateValue,
     discount: discount || 0,
     gstRate,
+    taxableAmount,
     gstAmount,
     total:total,
   };
@@ -743,7 +787,8 @@ setGst(totalGst);
                         ...item, 
                         quantity: newQuantity,
                         gstAmount: gstAmount,
-                        total: newTotal
+                        total: newTotal,
+                        taxableAmount:taxableAmount
                     };
                 }
                 return item;
@@ -773,7 +818,8 @@ setGst(totalGst);
                         ...item, 
                         cost: newCost,
                         gstAmount: gstAmount,
-                        total: newTotal
+                        total: newTotal,
+                        taxableAmount:taxableAmount
                     };
                 }
                 return item;
@@ -804,7 +850,8 @@ setGst(totalGst);
                         ...item,
                         discount: newDiscount,
                         gstAmount: gstAmount,
-                        total: newTotal
+                        total: newTotal,
+                        taxableAmount:taxableAmount
                     };
                 }
                 return item;
@@ -814,7 +861,7 @@ setGst(totalGst);
 />
                                         </td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
-                                        <td className='py-2 px-4 border border-gray-300'>{items.gst || 0}</td>
+                                        <td className='py-2 px-4 border border-gray-300'>{items.gstRate || 0}</td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.total.toFixed(2)}</td>
                                         <td className='py-2 px-4 border border-gray-300'>
                                             <button 
@@ -1028,17 +1075,44 @@ setGst(totalGst);
       <thead className='bg-gray-100'>
         <tr>
           <th className='py-2 px-4 border-b border-gray-300'>HSN Code</th>
-          <th className='py-2 px-4 border-b border-gray-300'>Total Amount (₹)</th>
+          <th className='py-2 px-4 border-b border-gray-300 text-right'>GST Rate (%)</th>
+          <th className='py-2 px-4 border-b border-gray-300 text-right'>Taxable Amount (₹)</th>
+          <th className='py-2 px-4 border-b border-gray-300 text-right'>Total Amount (₹)</th>
         </tr>
       </thead>
+
       <tbody>
-        {Object.entries(hsnTotals).map(([hsn, total]) => (
-          <tr key={hsn} className='hover:bg-gray-50'>
+        {Object.entries(hsnTotals).map(([hsn, data]) => (
+          <tr key={`${hsn}-${data.gstRate || 0}`} className='hover:bg-gray-50'>
             <td className='py-2 px-4 border-b border-gray-200'>{hsn}</td>
-            <td className='py-2 px-4 border-b border-gray-200'>₹{total.toFixed(2)}</td>
+            <td className='py-2 px-4 border-b border-gray-200 text-right'>
+              {Number(data?.gstRate || 0).toFixed(2)}%
+            </td>
+            <td className='py-2 px-4 border-b border-gray-200 text-right'>
+              ₹{Number(data?.gstAmount || 0).toFixed(2)}
+            </td>
+            <td className='py-2 px-4 border-b border-gray-200 text-right'>
+              ₹{Number(data?.total || 0).toFixed(2)}
+            </td>
           </tr>
         ))}
       </tbody>
+
+      <tfoot className='bg-gray-50 font-semibold'>
+        <tr>
+          <td className='py-2 px-4 text-right' colSpan={2}>Grand Total</td>
+          <td className='py-2 px-4 text-right'>
+            ₹{Object.values(hsnTotals)
+              .reduce((sum, d) => sum + Number(d?.gstAmount || 0), 0)
+              .toFixed(2)}
+          </td>
+          <td className='py-2 px-4 text-right'>
+            ₹{Object.values(hsnTotals)
+              .reduce((sum, d) => sum + Number(d?.total || 0), 0)
+              .toFixed(2)}
+          </td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 </div>

@@ -27,6 +27,8 @@ export async function POST(req) {
             group:customerData.group,
             pan:customerData.pan,
             short:customerData.short,
+            openingMode:customerData.openingMode,
+            lastMode:customerData.lastMode
         })
         
         const savedCustomer = await newCustomer.save().catch(err => {

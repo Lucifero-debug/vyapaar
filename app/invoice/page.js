@@ -125,6 +125,9 @@ const orderNo=searchParams.get("orderNo")
 const orderDate=searchParams.get("orderDate")
 const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(searchParams.get("hsnTotals"))) : {};
 
+// Compute total taxable amount and GST totals
+const totalTaxableAmount = items.reduce((sum, item) => sum + (item.taxableAmount || (item.cost * item.quantity)), 0);
+const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount || (item.cost * item.quantity)) * (item.gstRate || 0) / 100), 0);
 
 
 
@@ -176,11 +179,11 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
             <p className="mt-1">Tax Type: {taxType}</p>
             {taxType === 'local' ? (
               <>
-                <p>SGST: {(gst/2).toFixed(2)}</p>
-                <p>CGST: {(gst/2).toFixed(2)}</p>
+                <p>SGST: {(totalGstAmount/2).toFixed(2)}</p>
+                <p>CGST: {(totalGstAmount/2).toFixed(2)}</p>
               </>
             ) : (
-              <p>IGST: {gst}</p>
+              <p>IGST: {totalGstAmount}</p>
             )}
                {dispatchFrom && (
       <>
@@ -274,29 +277,46 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
 </tbody>
         </table>
 
-        {Object.keys(hsnTotals).length > 0 && (
-          <section className="mt-10" style={{ breakInside: 'avoid' }}>
-            <h2 className="text-lg font-bold text-gray-800 mb-3 border-b pb-1">HSN Code-wise Summary</h2>
-            <div className="flex justify-start">
-              <table className="text-sm border border-gray-300 w-full sm:w-[70%] md:w-[50%] lg:w-[40%]">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="py-2 px-4 text-left">HSN Code</th>
-                    <th className="py-2 px-4 text-right">Total Amount (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(hsnTotals).map(([hsn, total]) => (
-                    <tr key={hsn} className="border-b">
-                      <td className="py-2 px-4">{hsn}</td>
-                      <td className="py-2 px-4 text-right">₹{parseFloat(total).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+{Object.keys(hsnTotals).length > 0 && (
+  <section className="mt-10" style={{ breakInside: 'avoid' }}>
+    <h2 className="text-lg font-bold text-gray-800 mb-3 border-b pb-1">
+      HSN Code-wise Summary
+    </h2>
+    <div className="flex justify-start">
+      <table className="text-sm border border-gray-300 w-full sm:w-[80%] md:w-[60%] lg:w-[50%]">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="py-2 px-4 text-left border-b border-gray-300">HSN Code</th>
+            <th className="py-2 px-4 text-right border-b border-gray-300">GST Rate (%)</th>
+            <th className="py-2 px-4 text-right border-b border-gray-300">Taxable Amount (₹)</th>
+            <th className="py-2 px-4 text-right border-b border-gray-300">Total Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(hsnTotals).map(([hsn, data]) => (
+            <tr key={hsn} className="border-b border-gray-200 hover:bg-gray-50">
+              <td className="py-2 px-4">{hsn}</td>
+              <td className="py-2 px-4 text-right">{data.gstRate?.toFixed?.(2) || 0}%</td>
+              <td className="py-2 px-4 text-right">₹{Number(data.gstAmount || 0).toFixed(2)}</td>
+              <td className="py-2 px-4 text-right font-medium">₹{Number(data.total || 0).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="bg-gray-50 font-semibold">
+          <tr>
+            <td className="py-2 px-4 text-right" colSpan={2}>Grand Total</td>
+            <td className="py-2 px-4 text-right">
+              ₹{Object.values(hsnTotals).reduce((sum, d) => sum + (d.gstAmount || 0), 0).toFixed(2)}
+            </td>
+            <td className="py-2 px-4 text-right">
+              ₹{Object.values(hsnTotals).reduce((sum, d) => sum + (d.total || 0), 0).toFixed(2)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+)}
 
 {partyTaxes?.length > 0 && (
   <section className="max-w-xs ml-auto mt-4 text-right space-y-1">
@@ -316,14 +336,19 @@ const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(se
           <p><strong>Total:</strong> ₹{finalAmount.toFixed(2)}</p>
           <p><strong>Received:</strong> ₹{received.toFixed(2)}</p>
           <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
-          {taxType === 'local' ? (
-            <>
-              <p><strong>SGST:</strong> ₹{(gst / 2).toFixed(2)}</p>
-              <p><strong>CGST:</strong> ₹{(gst / 2).toFixed(2)}</p>
-            </>
-          ) : (
-            <p><strong>IGST:</strong> ₹{gst.toFixed(2)}</p>
-          )}
+{taxType === 'local' ? (
+  <>
+    <p><strong>Taxable Amount:</strong> ₹{totalTaxableAmount.toFixed(2)}</p>
+    <p><strong>SGST:</strong> ₹{(totalGstAmount / 2).toFixed(2)}</p>
+    <p><strong>CGST:</strong> ₹{(totalGstAmount / 2).toFixed(2)}</p>
+  </>
+) : (
+  <>
+    <p><strong>Taxable Amount:</strong> ₹{totalTaxableAmount.toFixed(2)}</p>
+    <p><strong>IGST:</strong> ₹{totalGstAmount.toFixed(2)}</p>
+  </>
+)}
+
         </section>
 
         {/* Footer */}

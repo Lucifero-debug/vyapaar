@@ -868,7 +868,7 @@ case 'HSN':
     : alterState === 'HSN'
     ? entity.hsncode
     : alterState === 'SaleInvoice' || alterState === 'PurchaseInvoice'||alterState === 'SaleReturn' || alterState === 'PurchaseReturn'  
-    ? entity.customer
+    ? entity.invoiceNo
     : alterState === 'Bank' || alterState === 'Cash'
     ? entity.name || entity.id
     : entity.invoiceNo;
@@ -952,7 +952,7 @@ if (
 }
 
 else {
-  keys = entity.customer;
+  keys = entity.invoiceNo;
   id = entity.invoiceNo;
 }
 

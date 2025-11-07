@@ -6,6 +6,9 @@ const customerSchema = new mongoose.Schema({
     name:{
         type:String,
     },
+    short:{
+        type:String
+    },
     email:{
         type:String,
     },
