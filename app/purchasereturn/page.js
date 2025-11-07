@@ -72,7 +72,7 @@ const [noOfPack, setNoOfPack] = useState(0);
 
 useEffect(() => {
   const fetchInvoiceNo = async () => {
-    if (!value&&isValueReady) { // Only fetch if not editing an existing invoice
+    if (!value) { // Only fetch if not editing an existing invoice
       try {
         const response = await fetch('/api/next-invoice-no');
         const data = await response.json();
