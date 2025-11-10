@@ -71,23 +71,33 @@ const [noOfPack, setNoOfPack] = useState(0);
     }
 
 useEffect(() => {
+  // Don't run until Suspense has resolved the param status
+
+  // Only fetch if we are creating a new invoice (no value in URL)
+  if (value) return;
+
+  let cancelled = false;
+
   const fetchInvoiceNo = async () => {
-    if (!value) { // Only fetch if not editing an existing invoice
-      try {
-        const response = await fetch('/api/next-invoice-no');
-        const data = await response.json();
-        if (data.invoiceNo) {
-          setInvoiceNo(data.invoiceNo);
-          localStorage.setItem('invoiceNo', data.invoiceNo);
-        }
-      } catch (err) {
-        console.error('Failed to fetch invoice number:', err);
+    try {
+      const response = await fetch('/api/next-invoice-no');
+      const data = await response.json();
+      if (!cancelled && data.invoiceNo) {
+        setInvoiceNo(data.invoiceNo);
+        console.log("✅ New Invoice:", data.invoiceNo);
+        localStorage.setItem('invoiceNo', data.invoiceNo);
       }
+    } catch (err) {
+      console.error('Failed to fetch invoice number:', err);
     }
   };
 
   fetchInvoiceNo();
-}, [value]);
+
+  return () => {
+    cancelled = true;
+  };
+}, [isValueReady, value]);
 
     // Load existing invoice data if value parameter exists
     useEffect(() => {
