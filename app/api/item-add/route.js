@@ -19,7 +19,9 @@ export async function POST(req) {
             purchasePrice:itemData.purchasePrice,
             gst:itemData.gst,
             discount:itemData.discount,
-            group:itemData.group
+            group:itemData.group,
+            openingQuantity:itemData.openBal,
+            lastQuantity:itemData.lastBal
         })
         
         console.log("hello kon",newItem)

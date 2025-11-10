@@ -70,8 +70,8 @@ const PageContent = () => {
           setName(data.name || '')
           setShort(data.short || '')
           setGroup(data.group || '')
-          setOpenBal(data.openBal || 0)
-          setLastBal(data.lastBal || 0)
+          setOpenBal(data.openingQuantity || 0)
+          setLastBal(data.lastQuantity || 0)
           setCost(data.cost || 0)
           setUnit(data.unit || 0)
           setSalePrice(data.salePrice || 0)
@@ -218,6 +218,7 @@ const PageContent = () => {
                   <InputField label="Sale Price" type="number" value={salePrice} onChange={setSalePrice} />
                   <InputField label="Item Type" value={itemType} onChange={setItemType} />
                   <InputField label="MRP" type="number" value={mrp} onChange={setMrp} />
+                  <InputField label="Cost" type="number" value={cost} onChange={setCost} />
                   <InputField label="Discount" type="number" value={discount} onChange={setDiscount} />
                   <InputField label="GST%" type="number" value={gst} readOnly />
                 </div>
@@ -238,20 +239,13 @@ const PageContent = () => {
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label>Opening Balance</Label>
+                    <Label>Opening Stock</Label>
                     <Input type="number" onChange={e => setOpenBal(+e.target.value || 0)} value={openBal} />
                   </div>
+       
                   <div className="space-y-1">
-                    <Label>Dr/Cr</Label>
-                    <Input type="number" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Last Year Balance</Label>
+                    <Label>Last Year Stock</Label>
                     <Input type="number" onChange={e => setLastBal(+e.target.value || 0)} value={lastBal} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Dr/Cr</Label>
-                    <Input type="number" />
                   </div>
                 </div>
               </CardContent>

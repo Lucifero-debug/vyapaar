@@ -72,7 +72,7 @@ const [noOfPack, setNoOfPack] = useState(0);
 
 useEffect(() => {
   const fetchInvoiceNo = async () => {
-    if (!value) {
+    if (!value || !isValueReady) {
       try {
         const response = await fetch('/api/next-invoice-no');
         const data = await response.json();
@@ -88,7 +88,7 @@ useEffect(() => {
   };
 
   fetchInvoiceNo();
-}, [value]);
+}, [value,isValueReady]);
 
 
     // Load existing invoice data if value parameter exists

@@ -12,14 +12,18 @@ export async function GET(req) {
     if (!itemId) {
       return NextResponse.json({ success: false, error: "Item ID is required" });
     }
-        if (itemId === "0") {
-          const ledgers = await ItemLedger.find().sort({ date: 1 }).lean();
-    
-          return NextResponse.json({
-            all: true,
-            ledgers,
-          });
-        }
+if (itemId === "0") {
+  const [items, ledgers] = await Promise.all([
+    Item.find().lean(),
+    ItemLedger.find().sort({ date: 1 }).lean(),
+  ]);
+
+  return NextResponse.json({
+    all: true,
+    items,
+    ledgers,
+  });
+}
 
     const item = await Item.findById(itemId);
     const ledgers = await ItemLedger.find({ itemName: item.name }).sort({ date: 1 });

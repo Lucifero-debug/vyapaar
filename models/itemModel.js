@@ -40,6 +40,12 @@ const itemSchema = new mongoose.Schema({
    },
    gst:{
     type:Number
+   },
+   openingQuantity:{
+    type:Number
+   },
+   lastQuantity:{
+    type:Number
    }
 })
 

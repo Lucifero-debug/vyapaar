@@ -10,6 +10,7 @@ export default function LedgerPage() {
   const [customerId, setCustomerId] = useState("");
   const [customer, setCustomer] = useState(null);
   const [ledgers, setLedgers] = useState([]);
+  const [allCustomers, setAllCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -27,9 +28,15 @@ export default function LedgerPage() {
         const res = await fetch(`/api/ledger?customerId=${customerId}`);
         if (!res.ok) throw new Error("Failed to fetch ledger data.");
         const data = await res.json();
-
-        setCustomer(data.customer || null);
-        setLedgers(data.ledgers || []);
+if (data.all) {
+  setAllCustomers(data.customers || []);
+  setLedgers(data.ledgers || []);
+  setCustomer(null);
+} else {
+  setCustomer(data.customer || null);
+  setLedgers(data.ledgers || []);
+  setAllCustomers([]);
+}
       } catch (err) {
         setError(err.message);
       } finally {
@@ -127,87 +134,112 @@ export default function LedgerPage() {
         </div>
 
         {/* Ledgers */}
-        {Object.entries(groupedByCustomer).length > 0 ? (
-          Object.entries(groupedByCustomer).map(([custName, entries], idx) => {
-            let runningBalance = 0;
-            let totalDebit = 0;
-            let totalCredit = 0;
+{Object.entries(groupedByCustomer).length > 0 ? (
+  Object.entries(groupedByCustomer).map(([custName, entries,openingBal], idx) => {
+ const currentCustomer =
+    customerId === "0"
+      ? allCustomers.find((c) => c.name === custName)
+      : customer;
 
-            const computedEntries = entries.map((e) => {
-              const debit = e.debit || 0;
-              const credit = e.credit || 0;
-              runningBalance += debit - credit;
-              totalDebit += debit;
-              totalCredit += credit;
+  const openingBalance = currentCustomer?.openingBal || 0;
+  let runningBalance = openingBalance;
+  let totalDebit = 0;
+  let totalCredit = 0;
 
-              return {
-                date: e.date,
-                description: e.narration || `Transaction with ${e.account || ""}`,
-                debit,
-                credit,
-                balance: Math.abs(runningBalance),
-                mode: runningBalance >= 0 ? "Dr" : "Cr",
-              };
-            });
 
-            return (
-              <div key={idx} className="mb-10 bg-white border border-gray-300 rounded-xl shadow-sm">
-                <div className="bg-blue-50 border-b border-gray-300 px-4 py-3 flex justify-between">
-                  <h3 className="text-lg font-semibold text-gray-800">{custName.toUpperCase()}</h3>
-                  <span className="text-sm text-gray-500">({entries.length} Entries)</span>
-                </div>
+    // 🔹 Prepare opening entry
+    const computedEntries = [
+      {
+        date: entries.length > 0 ? entries[0].date : new Date(),
+        description: "Opening Balance",
+        debit: openingBalance > 0 ? openingBalance : 0,
+        credit: openingBalance < 0 ? Math.abs(openingBalance) : 0,
+        balance: Math.abs(openingBalance),
+        mode: openingBalance >= 0 ? "Dr" : "Cr",
+        isOpening: true,
+      },
+      ...entries.map((e) => {
+        const debit = e.debit || 0;
+        const credit = e.credit || 0;
+        runningBalance += debit - credit;
+        totalDebit += debit;
+        totalCredit += credit;
 
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-gray-100 border-b border-gray-300">
-                      <th className="px-3 py-2 text-left w-[15%]">DATE</th>
-                      <th className="px-3 py-2 text-left w-[45%]">DESCRIPTION</th>
-                      <th className="px-3 py-2 text-right w-[10%]">DEBIT</th>
-                      <th className="px-3 py-2 text-right w-[10%]">CREDIT</th>
-                      <th className="px-3 py-2 text-right w-[20%]">BALANCE</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {computedEntries.map((entry, i) => (
-                      <tr key={i} className="border-b border-gray-200">
-                        <td className="px-3 py-2 text-gray-700">
-                          {entry.date ? new Date(entry.date).toLocaleDateString("en-IN") : "N/A"}
-                        </td>
-                        <td className="px-3 py-2 text-gray-700">{entry.description}</td>
-                        <td className="px-3 py-2 text-right text-green-700">
-                          {entry.debit ? formatAmount(entry.debit) : ""}
-                        </td>
-                        <td className="px-3 py-2 text-right text-red-700">
-                          {entry.credit ? formatAmount(entry.credit) : ""}
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold text-gray-800">
-                          {formatAmount(entry.balance)} {entry.mode}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="font-bold bg-gray-100 border-t border-gray-300">
-                      <td colSpan="2" className="px-3 py-2 text-right">
-                        TOTAL:
-                      </td>
-                      <td className="px-3 py-2 text-right">{formatAmount(totalDebit)}</td>
-                      <td className="px-3 py-2 text-right">{formatAmount(totalCredit)}</td>
-                      <td className="px-3 py-2 text-right">
-                        {formatAmount(Math.abs(runningBalance))}{" "}
-                        {runningBalance >= 0 ? "Dr" : "Cr"}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            );
-          })
-        ) : (
-          <div className="text-center text-gray-500 italic py-8">
-            No ledger entries found for this customer within the selected date range.
-          </div>
-        )}
+        return {
+          date: e.date,
+          description: e.narration || `Transaction with ${e.account || ""}`,
+          debit,
+          credit,
+          balance: Math.abs(runningBalance),
+          mode: runningBalance >= 0 ? "Dr" : "Cr",
+        };
+      }),
+    ];
+
+    return (
+      <div key={idx} className="mb-10 bg-white border border-gray-300 rounded-xl shadow-sm">
+        <div className="bg-blue-50 border-b border-gray-300 px-4 py-3 flex justify-between">
+          <h3 className="text-lg font-semibold text-gray-800">{custName.toUpperCase()}</h3>
+          <span className="text-sm text-gray-500">({entries.length} Entries)</span>
+        </div>
+
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-100 border-b border-gray-300">
+              <th className="px-3 py-2 text-left w-[15%]">DATE</th>
+              <th className="px-3 py-2 text-left w-[45%]">DESCRIPTION</th>
+              <th className="px-3 py-2 text-right w-[10%]">DEBIT</th>
+              <th className="px-3 py-2 text-right w-[10%]">CREDIT</th>
+              <th className="px-3 py-2 text-right w-[20%]">BALANCE</th>
+            </tr>
+          </thead>
+          <tbody>
+            {computedEntries.map((entry, i) => (
+              <tr
+                key={i}
+                className={`border-b border-gray-200 ${
+                  entry.isOpening ? "bg-yellow-50 font-semibold" : ""
+                }`}
+              >
+                <td className="px-3 py-2 text-gray-700">
+                  {entry.date ? new Date(entry.date).toLocaleDateString("en-IN") : "N/A"}
+                </td>
+                <td className="px-3 py-2 text-gray-700">{entry.description}</td>
+                <td className="px-3 py-2 text-right text-green-700">
+                  {entry.debit ? formatAmount(entry.debit) : ""}
+                </td>
+                <td className="px-3 py-2 text-right text-red-700">
+                  {entry.credit ? formatAmount(entry.credit) : ""}
+                </td>
+                <td className="px-3 py-2 text-right font-semibold text-gray-800">
+                  {formatAmount(entry.balance)} {entry.mode}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="font-bold bg-gray-100 border-t border-gray-300">
+              <td colSpan="2" className="px-3 py-2 text-right">
+                TOTAL:
+              </td>
+              <td className="px-3 py-2 text-right">{formatAmount(totalDebit)}</td>
+              <td className="px-3 py-2 text-right">{formatAmount(totalCredit)}</td>
+              <td className="px-3 py-2 text-right">
+                {formatAmount(Math.abs(runningBalance))}{" "}
+                {runningBalance >= 0 ? "Dr" : "Cr"}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  })
+) : (
+  <div className="text-center text-gray-500 italic py-8">
+    No ledger entries found for this customer within the selected date range.
+  </div>
+)}
+
       </div>
     </>
   );

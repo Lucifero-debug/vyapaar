@@ -776,7 +776,7 @@ case 'HSN':
 
                 <PopoverContent className="w-[250px] p-0">
                   <Command>
-                    <CommandInput placeholder="Search Item..." className="h-9" />
+                    <CommandInput placeholder="Search Item Ledger..." className="h-9" />
                     <CommandList>
                       <CommandEmpty>No items found.</CommandEmpty>
                       <CommandGroup>

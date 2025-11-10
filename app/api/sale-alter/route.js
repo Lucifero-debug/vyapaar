@@ -75,6 +75,7 @@ export async function POST(req) {
 
     customer.lastBal = Math.abs(updatedBalance);
     await customer.save();
+    console.log("jeesse",updatedInvoice)
     
     return NextResponse.json({
       message: "Invoice updated successfully",
