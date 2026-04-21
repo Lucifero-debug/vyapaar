@@ -14,7 +14,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # Your Next.js URL
+    allow_origins=["http://localhost:3000","https://vyapaar-git-vercel-rea-4392dd-prashant-kumars-projects-7ee77547.vercel.app"], # Your Next.js URL
     allow_methods=["*"],
     allow_headers=["*"],
 )
