@@ -25,12 +25,15 @@ const invoiceSchema = new mongoose.Schema(
     againstInvoiceNo: { type: Number },
     date: { type: Date, required: true },
     
-    customer: {
-      name: { type: String, required: true },
-      phone: { type: String },
-      email: { type: String },
-      custId:{type:String},
-    },
+customer: {
+  type: {
+    name: { type: String, required: true },
+    phone: { type: String },
+    email: { type: String },
+    custId: { type: String },
+  },
+  required: false
+},
     hsnTotals: [
   {
     hsn: { type: String, required: true },

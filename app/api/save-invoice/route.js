@@ -10,115 +10,90 @@ import ItemLedger from "../../../models/itemLedgerModel";
 export async function POST(req) {
   try {
     await connect();
-
     const body = await req.json();
 
     // 1️⃣ Create the invoice first
     const newInvoice = await Invoice.create(body);
+    const invoiceNo = newInvoice.invoiceNo || (await getNextInvoiceNo());
 
-    // 2️⃣ Get the next invoice number (for display + narration)
-    const invoice = await getNextInvoiceNo();
+    // Flag to check if we should skip customer/accounting logic
+    const isUpload = body.source === "upload";
 
-    // 3️⃣ Find the customer
-    const customer = await Customer.findOne({ name: body.customer.name });
+    let updatedBalance = 0;
+    let ledgerEntry = null;
 
-    if (!customer) {
-      return NextResponse.json({
-        success: false,
-        error: "Customer not found",
-      });
+    console.log("hello",isUpload)
+    // 2️⃣ CUSTOMER & LEDGER LOGIC (Skipped if source is upload)
+    if (!isUpload) {
+      const customer = await Customer.findOne({ name: body.customer.name });
+
+      if (!customer) {
+        return NextResponse.json({
+          success: false,
+          error: "Customer not found",
+        });
+      }
+
+      let prevBalance = customer.lastBal || 0;
+      let invoiceAmount = body.balanceDue || 0;
+
+      if (body.type === "Sale") {
+        updatedBalance = body.return ? prevBalance - invoiceAmount : prevBalance + invoiceAmount;
+        customer.lastMode = updatedBalance >= 0 ? "Dr" : "Cr";
+      } else if (body.type === "Purchase") {
+        updatedBalance = body.return ? prevBalance + invoiceAmount : prevBalance - invoiceAmount;
+        customer.lastMode = updatedBalance >= 0 ? "Cr" : "Dr";
+      }
+
+      customer.lastBal = Math.abs(updatedBalance);
+      await customer.save();
+
+      // Create Ledger Entry
+      const narrationText = `By Invoice No: ${invoiceNo}`;
+      ledgerEntry = {
+        customerName: body.customer.name,
+        date: newInvoice.date || new Date(),
+        account: body.type === "Sale" ? "Sales Account" : "Purchase Account",
+        paymentType: body.paymentType || "Credit",
+        debit: body.type === "Sale" ? invoiceAmount : 0,
+        credit: body.type === "Purchase" ? invoiceAmount : 0,
+        balance: updatedBalance,
+        narration: narrationText,
+        voucherId: newInvoice._id,
+      };
+      await Ledger.create(ledgerEntry);
     }
 
-    // 4️⃣ Calculate updated balance
-    let prevBalance = customer.lastBal || 0;
-    let invoiceAmount = body.balanceDue || 0;
-    let updatedBalance;
+    // 3️⃣ ITEM LEDGER LOGIC (Always runs)
+    const existingEntries = await ItemLedger.find({ invoiceNo: invoiceNo });
+    if (existingEntries.length === 0 && body.items && Array.isArray(body.items)) {
+      for (const item of body.items) {
+        const receiptQty = body.type === "Purchase" || body.returnType === "SaleReturn" ? item.quantity : 0;
+        const issueQty = body.type === "Sale" || body.returnType === "PurchaseReturn" ? item.quantity : 0;
 
-    if (body.type === "Sale") {
-      updatedBalance = body.return
-        ? prevBalance - invoiceAmount // Sale return → you owe them
-        : prevBalance + invoiceAmount; // Normal sale → they owe you
-      customer.lastMode = updatedBalance >= 0 ? "Dr" : "Cr";
-    } else if (body.type === "Purchase") {
-      updatedBalance = body.return
-        ? prevBalance + invoiceAmount // Purchase return → they owe you
-        : prevBalance - invoiceAmount; // Purchase → you owe them
-      customer.lastMode = updatedBalance >= 0 ? "Cr" : "Dr";
+        const lastEntry = await ItemLedger.findOne({ itemName: item.name }).sort({ date: -1 }).lean();
+        const prevItemBal = lastEntry ? lastEntry.balanceQuantity : 0;
+        const newItemBal = prevItemBal + receiptQty - issueQty;
+
+        await ItemLedger.create({
+          date: newInvoice.date || new Date(),
+          invoiceNo: invoiceNo,
+          typeOfVoucher: body.type,
+          partyName: body.customer?.name || "Bulk Upload",
+          receiptQuantity: receiptQty,
+          issueQuantity: issueQty,
+          balanceQuantity: newItemBal,
+          itemName: item.name,
+        });
+      }
     }
-
-    customer.lastBal = Math.abs(updatedBalance);
-    await customer.save();
-
-    // 5️⃣ Create Ledger Entry
-    const narrationText = `By Invoice No: ${newInvoice.invoiceNo || invoice}`;
-
-    const ledgerEntry = {
-      customerName: body.customer.name,
-      date: newInvoice.date || new Date(),
-      account: body.type === "Sale" ? "Sales Account" : "Purchase Account",
-      paymentType: body.paymentType || "Credit",
-      debit: body.type === "Sale" ? invoiceAmount : 0,
-      credit: body.type === "Purchase" ? invoiceAmount : 0,
-      balance: updatedBalance,
-      narration: narrationText,
-      voucherId: newInvoice._id,
-    };
-
-    await Ledger.create(ledgerEntry);
-
-const existingEntries = await ItemLedger.find({ invoiceNo: newInvoice.invoiceNo });
-if (existingEntries.length === 0) {
-if (body.items && Array.isArray(body.items)) {
-  for (const item of body.items) {
-    const receiptQty =
-      body.type === "Purchase" || body.returnType === "SaleReturn"
-        ? item.quantity
-        : 0;
-    const issueQty =
-      body.type === "Sale" || body.returnType === "PurchaseReturn"
-        ? item.quantity
-        : 0;
-
-    // find previous item ledger balance
-  const lastEntry = await ItemLedger.findOne({ itemName: item.name })
-    .sort({ date: -1 })
-    .lean();
-
-  const prevBalance = lastEntry ? lastEntry.balanceQuantity : 0;
-
-  // 🟢 SIGFA-style logic:
-  // new balance = previous balance + receipts - issues
-  const newBalance = prevBalance + receiptQty - issueQty;
-
-await ItemLedger.create({
-  date: newInvoice.date || new Date(),
-  invoiceNo: newInvoice.invoiceNo || invoice,
-  typeOfVoucher: body.type,
-  partyName: body.customer.name,
-  receiptQuantity: receiptQty,
-  issueQuantity: issueQty,
-  balanceQuantity: newBalance,
-  itemName: item.name,
-});
-
-  }
-}
-
-}
-
-    // 6️⃣ Create Item Ledger Entries
-
 
     return NextResponse.json({
       success: true,
       invoice: newInvoice,
-      customerBalance: {
-        name: customer.name,
-        balance: customer.lastBal,
-        mode: customer.lastMode,
-      },
-      ledgerEntry,
+      message: isUpload ? "Invoice uploaded successfully (Ledger skipped)" : "Invoice created and Ledger updated",
     });
+
   } catch (err) {
     console.error("Error creating invoice:", err);
     return NextResponse.json({ success: false, error: err.message });
