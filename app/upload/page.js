@@ -19,7 +19,7 @@ const handleUpload = async () => {
 
   try {
     // 1. Get structured data from FastAPI
-    const res = await fetch("http://127.0.0.1:8000/start", {
+    const res = await fetch("https://vyapaar-4.onrender.com/start", {
       method: "POST",
       body: formData,
     });
