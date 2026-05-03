@@ -57,7 +57,7 @@ const PageContent = () => {
           setLastBal(d.lastBal || 0);
           setAddress(d.address || '');
           setPincode(d.pincode || 0);
-          setPhone(d.phone || 0);
+          setPhone(d.phone ?? null);
           setCity(d.city || '');
           setState(d.state || '');
           setGstIn(d.gstIn || '');
