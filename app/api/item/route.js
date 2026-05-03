@@ -10,6 +10,7 @@ export async function POST(req){
         const value=itemdata.value
         const item= await Item.find({   
             $or: [
+                 { _id: value },
                 { name: value },       // Searching by name
                 { group: value },      // Searching by group
                 { customer: value }    // Searching by customer (adjust the field name accordingly)

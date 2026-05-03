@@ -39,6 +39,10 @@ import ManIcon from '@mui/icons-material/Man';
 import HsnMaster from '@/components/HsnMaster';
 import { set } from 'mongoose';
 
+
+
+
+
 const Page = () => {
   const router = useRouter();
   const [showHsnMaster, setShowHsnMaster] = useState(false);
@@ -60,7 +64,7 @@ const Page = () => {
   const [del, setDel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedHsn, setSelectedHsn] = useState(null);
-
+ const [loadings, setLoadings] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -156,11 +160,7 @@ setTotalSalesAmount(totalSales);
     fetchData();
   }, []);
 
-  useEffect(() => {
-  if (alter || del) {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  }
-}, [alter, del]);
+
 
 console.log("Jaat",saleInvoices)
   const handleSelect = (currentValue) => {
@@ -297,6 +297,215 @@ case 'HSN':
     }
   };
 
+   const handleClearData = async () => {
+    const confirmed = window.confirm(
+      "Are you sure? This will delete ALL Items, Customers, Invoices, and HSN data permanently."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoadings(true);
+
+      const res = await fetch("/api/clear-all-data", {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      alert(data.message);
+    } catch (error) {
+      alert("Something went wrong");
+    } finally {
+      setLoadings(false);
+    }
+  };
+
+const renderAlterDeleteSection = (sectionName) => {
+  const shouldRender =
+    (alter && alterState === sectionName) ||
+    (del && deleteState === sectionName);
+
+  if (!shouldRender) return null;
+
+  let entities = [];
+
+  switch (sectionName) {
+    case "Customer":
+      entities = customer;
+      break;
+
+    case "Item":
+      entities = item;
+      break;
+
+    case "HSN":
+      entities = hsn;
+      break;
+
+    case "Bank":
+      entities = bank;
+      break;
+
+    case "Cash":
+      entities = cash;
+      break;
+
+    case "SaleInvoice":
+      entities = saleInvoices;
+      break;
+
+    case "PurchaseInvoice":
+      entities = purchaseInvoices;
+      break;
+
+    case "SaleReturn":
+      entities = saleReturns;
+      break;
+
+    case "PurchaseReturn":
+      entities = purchaseReturns;
+      break;
+
+    default:
+      entities = [];
+  }
+
+  const getDisplayValue = () => {
+    if (!value) return `Select ${sectionName}`;
+
+    const selected = entities.find((e) => {
+      if (sectionName === "HSN") {
+        return e.hsncode === value;
+      }
+
+      if (
+        sectionName === "Customer" ||
+        sectionName === "Item" ||
+        sectionName === "Bank" ||
+        sectionName === "Cash"
+      ) {
+        return e.id === value || e.name === value;
+      }
+
+      return e.invoiceNo === value;
+    });
+
+    if (!selected) return `Select ${sectionName}`;
+
+    if (sectionName === "HSN") {
+      return selected.hsncode;
+    }
+
+    if (
+      sectionName === "Customer" ||
+      sectionName === "Item" ||
+      sectionName === "Bank" ||
+      sectionName === "Cash"
+    ) {
+      return selected.name;
+    }
+
+    return selected.invoiceNo;
+  };
+
+  return (
+    <div className="mt-4 flex justify-center">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-[280px] justify-between"
+          >
+            {getDisplayValue()}
+            <ChevronsUpDown className="opacity-50" />
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-[280px] p-0">
+          <Command>
+            <CommandInput
+              placeholder={`Search ${sectionName}`}
+              className="h-9"
+            />
+
+            <CommandList>
+              <CommandEmpty>No result found.</CommandEmpty>
+
+              <CommandGroup>
+                {entities.map((entity) => {
+                  let label = "";
+                  let alterValue = "";
+                  let deleteValue = "";
+
+                  // HSN
+                  if (sectionName === "HSN") {
+                    label = entity.hsncode;
+                    alterValue = entity.hsncode;
+                    deleteValue = entity.id;
+                  }
+
+                  // Customer / Item / Bank / Cash
+                  else if (
+                    sectionName === "Customer" ||
+                    sectionName === "Item" ||
+                    sectionName === "Bank" ||
+                    sectionName === "Cash"
+                  ) {
+                    label = entity.name;
+                    alterValue = entity.id;
+                    deleteValue = entity.id;
+                  }
+
+                  // Invoice sections
+                  else {
+                    label = entity.invoiceNo;
+                    alterValue = entity.invoiceNo;
+                    deleteValue = entity.invoiceNo;
+                  }
+
+                  return (
+                    <CommandItem
+                      key={deleteValue}
+                      value={label}
+                      onSelect={() => {
+                        setValue(
+                          alter ? alterValue : deleteValue
+                        );
+
+                        setOpen(false);
+
+                        if (alter) {
+                          handleSelect(alterValue);
+                        } else {
+                          handleDelete(deleteValue);
+                        }
+                      }}
+                    >
+                      {label}
+
+                      <Check
+                        className={cn(
+                          "ml-auto",
+                          value === alterValue ||
+                            value === deleteValue
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
+
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <div className="bg-blue-600 rounded-lg shadow-lg p-6 text-white mb-6">
@@ -348,7 +557,7 @@ case 'HSN':
                 </DropdownMenuContent>
               </DropdownMenu>
             </AccordionContent>
-
+  {renderAlterDeleteSection("SaleInvoice")}
             <AccordionContent className="bg-white px-4 py-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -385,6 +594,7 @@ case 'HSN':
                 </DropdownMenuContent>
               </DropdownMenu>
             </AccordionContent>
+              {renderAlterDeleteSection("SaleReturn")}
           </AccordionItem>
         </Accordion>
 
@@ -429,7 +639,7 @@ case 'HSN':
                 </DropdownMenuContent>
               </DropdownMenu>
             </AccordionContent>
-
+    {renderAlterDeleteSection("PurchaseInvoice")}
             <AccordionContent className="bg-white px-4 py-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -463,8 +673,10 @@ case 'HSN':
                 </DropdownMenuContent>
               </DropdownMenu>
             </AccordionContent>
+                {renderAlterDeleteSection("PurchaseInvoice")}
           </AccordionItem>
         </Accordion>
+         {renderAlterDeleteSection("PurchaseReturn")}
 
         <Accordion type="single" collapsible>
           <AccordionItem value="item-3">
@@ -507,6 +719,7 @@ case 'HSN':
                 </DropdownMenuContent>
               </DropdownMenu>
             </AccordionContent>
+                {renderAlterDeleteSection("Customer")}
 
             <AccordionContent className="bg-white px-4 py-3">
               <DropdownMenu>
@@ -542,6 +755,7 @@ case 'HSN':
                 </DropdownMenuContent>
               </DropdownMenu>
             </AccordionContent>
+             {renderAlterDeleteSection("Item")}
 
 <AccordionContent className="bg-white px-4 py-3">
   <DropdownMenu>
@@ -567,6 +781,7 @@ case 'HSN':
     </DropdownMenuContent>
   </DropdownMenu>
 </AccordionContent>
+              {renderAlterDeleteSection("HSN")}
 
 
 
@@ -837,9 +1052,16 @@ case 'HSN':
 <SettingsApplicationsIcon/>  Upload
 </div>
 
+ <button
+      onClick={handleClearData}
+      disabled={loading}
+      className="px-6 py-3 rounded-lg bg-gray-500 text-white font-semibold hover:bg-gray-600 disabled:opacity-50"
+    >
+      {loadings ? "Deleting..." : "Clear All Data"}
+    </button>
 
       {/* Alter Section */}
-      {alter && (
+      {/* {alter && (
         <div className="mt-6 flex justify-center">
           {loading ? (
             <p>Loading data...</p>
@@ -894,11 +1116,11 @@ case 'HSN':
             </Popover>
           )}
         </div>
-      )}
+      )} */}
 
 
       {/* Delete Section */}
-      {del && (
+      {/* {del && (
         <div className="mt-6 flex justify-center">
           {loading ? (
             <p>Loading data...</p>
@@ -978,7 +1200,7 @@ else {
             </Popover>
           )}
         </div>
-      )}
+      )} */}
       </div>
                  {showHsnMaster && (
   <HsnMaster

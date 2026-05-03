@@ -7,7 +7,7 @@ export async function POST(req) {
     try {
         await connect()
         const customerData = await req.json();
-        const customerId=customerData.id    
+        const customerId=customerData.value    
         console.log("maanatg",customerData)
         const updatedCustomer= await Customer.findOneAndUpdate({
              _id: customerId   
