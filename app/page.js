@@ -64,7 +64,7 @@ const Page = () => {
   const [del, setDel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedHsn, setSelectedHsn] = useState(null);
- const [loadings, setLoadings] = useState(false);
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -297,29 +297,7 @@ case 'HSN':
     }
   };
 
-   const handleClearData = async () => {
-    const confirmed = window.confirm(
-      "Are you sure? This will delete ALL Items, Customers, Invoices, and HSN data permanently."
-    );
 
-    if (!confirmed) return;
-
-    try {
-      setLoadings(true);
-
-      const res = await fetch("/api/clear-all-data", {
-        method: "DELETE",
-      });
-
-      const data = await res.json();
-
-      alert(data.message);
-    } catch (error) {
-      alert("Something went wrong");
-    } finally {
-      setLoadings(false);
-    }
-  };
 
 const renderAlterDeleteSection = (sectionName) => {
   const shouldRender =
@@ -1052,13 +1030,7 @@ const renderAlterDeleteSection = (sectionName) => {
 <SettingsApplicationsIcon/>  Upload
 </div>
 
- <button
-      onClick={handleClearData}
-      disabled={loading}
-      className="px-6 py-3 rounded-lg bg-gray-500 text-white font-semibold hover:bg-gray-600 disabled:opacity-50"
-    >
-      {loadings ? "Deleting..." : "Clear All Data"}
-    </button>
+
 
       {/* Alter Section */}
       {/* {alter && (

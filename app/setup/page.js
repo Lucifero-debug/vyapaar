@@ -1,9 +1,10 @@
 'use client'
-import React from 'react';
+import React, { useState } from 'react';
 import { useSaleOptions } from '@/context/SaleOptionContext';
 
 const Page = () => {
   const { options, setOptions } = useSaleOptions();
+   const [loadings, setLoadings] = useState(false);
 
   const handleChange = (e) => {
     const { name, checked } = e.target;
@@ -11,6 +12,30 @@ const Page = () => {
       ...prev,
       [name]: checked,
     }));
+  };
+
+     const handleClearData = async () => {
+    const confirmed = window.confirm(
+      "Are you sure? This will delete ALL Items, Customers, Invoices, and HSN data permanently."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoadings(true);
+
+      const res = await fetch("/api/clear-all-data", {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      alert(data.message);
+    } catch (error) {
+      alert("Something went wrong");
+    } finally {
+      setLoadings(false);
+    }
   };
 
   const optionLabels = {
@@ -40,6 +65,13 @@ const Page = () => {
             />
           </label>
         ))}
+       <button
+      onClick={handleClearData}
+      disabled={loadings}
+      className="px-6 py-3 rounded-lg bg-gray-500 text-white font-semibold hover:bg-gray-600 disabled:opacity-50"
+    >
+      {loadings ? "Deleting..." : "Clear All Data"}
+    </button>
       </div>
     </div>
   );

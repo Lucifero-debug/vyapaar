@@ -25,6 +25,9 @@ export async function POST(req) {
                 gst: itemData.gst,
                 discount: itemData.discount,
                 group: itemData.group,
+                    short:itemData.short,
+                                openingQuantity:itemData.openBal,
+            lastQuantity:itemData.lastBal,
             },
             { new: true } // Return the updated document
         ).catch(err => {

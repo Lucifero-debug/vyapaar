@@ -6,7 +6,8 @@ import Customer from '../../../models/custModel'
 export async function POST(req) {
     try {
         await connect()
-        const customerData = await req.json();    
+        const customerData = await req.json();   
+        console.log('Received Customer Data:', customerData); 
         const newCustomer= new Customer({
             name:customerData.name,
             email:customerData.email,
@@ -18,7 +19,7 @@ export async function POST(req) {
             city:customerData.city,
             state:customerData.state,
             gstIn:customerData.gstIn,
-            statecode:customerData.statecode,
+            stateCode:customerData.stateCode,
             pan:customerData.pan,
             aadhar:customerData.aadhar,
             bank:customerData.bank,
@@ -28,7 +29,8 @@ export async function POST(req) {
             pan:customerData.pan,
             short:customerData.short,
             openingMode:customerData.openingMode,
-            lastMode:customerData.lastMode
+            lastMode:customerData.lastMode,
+            dealerType:customerData.dealerType
         })
         
         const savedCustomer = await newCustomer.save().catch(err => {

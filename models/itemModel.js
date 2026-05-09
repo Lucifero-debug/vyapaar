@@ -11,6 +11,9 @@ const itemSchema = new mongoose.Schema({
         type:String,
         required:[true,"Please provide a Hsn code"],
     },
+    short:{
+        type:String
+    },
    group:{
     type:String,
    }, 

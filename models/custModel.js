@@ -30,7 +30,7 @@ const customerSchema = new mongoose.Schema({
    phone:{
     type:Number,
    }, 
-   statecode:{
+   stateCode:{
     type:Number,
    }, 
    bank:{
@@ -49,7 +49,7 @@ type:String,
     type:String,
    }, 
    aadhar:{
-    type:Number,
+    type:String,
    }, 
    gstIn:{
     type:String,
@@ -68,6 +68,9 @@ type:String,
    },
    dealerType:{
     type:String
+   },
+   discount:{
+    type:Number
    }
 })
 

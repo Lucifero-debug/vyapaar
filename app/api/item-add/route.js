@@ -21,7 +21,8 @@ export async function POST(req) {
             discount:itemData.discount,
             group:itemData.group,
             openingQuantity:itemData.openBal,
-            lastQuantity:itemData.lastBal
+            lastQuantity:itemData.lastBal,
+            short:itemData.short
         })
         
         console.log("hello kon",newItem)

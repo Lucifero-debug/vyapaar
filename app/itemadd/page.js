@@ -94,6 +94,7 @@ const PageContent = () => {
       group,
       hsn,
       cost,
+      short,
       unit,
       salePrice,
       itemType,

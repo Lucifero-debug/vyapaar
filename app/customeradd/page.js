@@ -35,7 +35,7 @@ const PageContent = () => {
   const [aadhar, setAadhar] = useState('');
   const [pan, setPan] = useState('');
   const [dealerType,setDealerType] =useState("")
-  const [bank, setBank] = useState(0);
+  const [bank, setBank] = useState('');
   const [interest, setInterest] = useState(0);
   const [discount, setDiscount] = useState(0);
 
@@ -80,7 +80,7 @@ const PageContent = () => {
     const customerData = {
       id: id || undefined,
       name, short, group, openBal, lastBal, address, pincode, phone,
-      city, state, gstIn, stateCode, email, aadhar, pan, bank, interest, discount,openingMode,lastMode
+      city, state, gstIn, stateCode, email, aadhar, pan, bank, interest, discount,openingMode,lastMode,dealerType
     };
 
     const endpoint = value ? '/api/customer-alter' : '/api/customer-add';
@@ -243,8 +243,8 @@ const PageContent = () => {
                 { label: 'State Code', val: stateCode, fn: setStateCode, type: 'number' },
                 { label: 'Email', val: email, fn: setEmail, type: 'text' },
                 { label: 'PAN', val: pan, fn: setPan, type: 'text' },
-                { label: 'Aadhar', val: aadhar, fn: setAadhar, type: 'number' },
-                { label: 'Bank', val: bank, fn: setBank, type: 'number' },
+                { label: 'Aadhar', val: aadhar, fn: setAadhar, type: 'text' },
+                { label: 'Bank', val: bank, fn: setBank, type: 'text' },
                 { label: 'Discount', val: discount, fn: setDiscount, type: 'number' },
                 { label: 'Interest', val: interest, fn: setInterest, type: 'number' },
                 { label: 'Dealer Type', val: dealerType, fn: setDealerType, type: 'text' },

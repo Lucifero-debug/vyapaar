@@ -658,25 +658,51 @@ setGst(totalGst);
                     </select>
                 </div>
 
-                {/* Phone (read only) */}
-                <div className='flex flex-col'>
-                    <label className='text-gray-600 font-medium mb-1'>Phone</label>
-                    <input 
-                        className='h-10 px-3 border rounded-lg shadow-sm bg-gray-100' 
-                        value={selectedCustomer.phone || ''} 
-                        readOnly 
-                    />
-                </div>
+                
+                    <div className='flex justify-between items-center'>
+                        <h2 className='text-lg font-medium text-gray-700'>State Of Supply</h2>
+                        <select 
+                            className='w-32 h-10 px-2 border rounded-lg' 
+                            value={stateOfSupply} 
+                            onChange={(e) => setStateOfSupply(e.target.value)}
+                        >
+                            <option value='Delhi'>Delhi</option>
+                            <option value='Mumbai'>Mumbai</option>
+                            <option value='Jaipur'>Jaipur</option>
+                        </select>
+                    </div>
+
+            
+                    <div className='flex justify-between items-center'>
+                        <div className='flex items-center gap-2'>
+                            <label htmlFor='local' className='text-gray-700'>Local</label>
+                            <input 
+                                type='radio' 
+                                id='local' 
+                                name='location' 
+                                value='local'
+                                className='w-5 h-5' 
+                                checked={taxType === 'local'} 
+                                onChange={handleTaxTypeChange} 
+                            />
+                        </div>
+                        <div className='flex items-center gap-2'>
+                            <label htmlFor='central' className='text-gray-700'>Central</label>
+                            <input 
+                                type='radio' 
+                                id='central' 
+                                name='location' 
+                                value='central'
+                                className='w-5 h-5' 
+                                checked={taxType === 'central'} 
+                                onChange={handleTaxTypeChange} 
+                            />
+                        </div>
+                    </div>
+
 
                 {/* Email (read only) */}
-                <div className='flex flex-col'>
-                    <label className='text-gray-600 font-medium mb-1'>Email</label>
-                    <input 
-                        className='h-10 px-3 border rounded-lg shadow-sm bg-gray-100' 
-                        value={selectedCustomer.email || ''} 
-                        readOnly 
-                    />
-                </div>
+
 
                 {/* Item Dropdown */}
                 <div className='flex flex-col'>
@@ -1036,46 +1062,23 @@ setGst(totalGst);
                             <option value='Cheque'>Cheque</option>
                         </select>
                     </div>
+                <div className='flex flex-col'>
+                    <label className='text-gray-600 font-medium mb-1'>Phone</label>
+                    <input 
+                        className='h-10 px-3 border rounded-lg shadow-sm bg-gray-100' 
+                        value={selectedCustomer.phone || ''} 
+                        readOnly 
+                    />
+                </div>
 
-                    <div className='flex justify-between items-center'>
-                        <h2 className='text-lg font-medium text-gray-700'>State Of Supply</h2>
-                        <select 
-                            className='w-32 h-10 px-2 border rounded-lg' 
-                            value={stateOfSupply} 
-                            onChange={(e) => setStateOfSupply(e.target.value)}
-                        >
-                            <option value='Delhi'>Delhi</option>
-                            <option value='Mumbai'>Mumbai</option>
-                            <option value='Jaipur'>Jaipur</option>
-                        </select>
-                    </div>
-
-                    <div className='flex justify-between items-center'>
-                        <div className='flex items-center gap-2'>
-                            <label htmlFor='local' className='text-gray-700'>Local</label>
-                            <input 
-                                type='radio' 
-                                id='local' 
-                                name='location' 
-                                value='local'
-                                className='w-5 h-5' 
-                                checked={taxType === 'local'} 
-                                onChange={handleTaxTypeChange} 
-                            />
-                        </div>
-                        <div className='flex items-center gap-2'>
-                            <label htmlFor='central' className='text-gray-700'>Central</label>
-                            <input 
-                                type='radio' 
-                                id='central' 
-                                name='location' 
-                                value='central'
-                                className='w-5 h-5' 
-                                checked={taxType === 'central'} 
-                                onChange={handleTaxTypeChange} 
-                            />
-                        </div>
-                    </div>
+                 <div className='flex flex-col'>
+                    <label className='text-gray-600 font-medium mb-1'>Email</label>
+                    <input 
+                        className='h-10 px-3 border rounded-lg shadow-sm bg-gray-100' 
+                        value={selectedCustomer.email || ''} 
+                        readOnly 
+                    />
+                </div>
                 </div>
 </div>
 
@@ -1083,49 +1086,44 @@ setGst(totalGst);
 <div className='mt-6'>
   <h2 className='font-bold text-xl mb-2'>HSN Code-wise Totals</h2>
   <div className='border border-gray-300 rounded-md overflow-hidden'>
-    <table className='w-full text-left border-collapse'>
-      <thead className='bg-gray-100'>
-        <tr>
-          <th className='py-2 px-4 border-b border-gray-300'>HSN Code</th>
-          <th className='py-2 px-4 border-b border-gray-300 text-right'>GST Rate (%)</th>
-          <th className='py-2 px-4 border-b border-gray-300 text-right'>Taxable Amount (₹)</th>
-          <th className='py-2 px-4 border-b border-gray-300 text-right'>Total Amount (₹)</th>
+<table className='min-w-full table-auto border-collapse border border-gray-300 text-left'>
+    <thead>
+        <tr className='bg-blue-100 text-gray-700 uppercase text-sm leading-normal'>
+            <th className='py-2 px-4 border border-gray-300'>HSN Code</th>
+            {/* NEW COLUMN ADDED HERE */}
+            <th className='py-2 px-4 border border-gray-300'>Taxable Amount</th> 
+            <th className='py-2 px-4 border border-gray-300'>GST (%)</th>
+            <th className='py-2 px-4 border border-gray-300'>Total</th>
+            <th className='py-2 px-4 border border-gray-300'>Action</th>
         </tr>
-      </thead>
+    </thead>
+    <tbody>
+        {selectedItem.map((items, index) => (
+            <tr key={index} className='even:bg-gray-50 odd:bg-white'>
+                <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
+                
+                {/* NEW COLUMN DATA RENDERED HERE */}
+                <td className='py-2 px-4 border border-gray-300 font-medium text-gray-700'>
+                    {items.taxableAmount 
+                        ? items.taxableAmount.toFixed(2) 
+                        : ((items.cost * items.quantity) - ((items.cost * items.quantity * (items.discount || 0)) / 100)).toFixed(2)
+                    }
+                </td>
 
-      <tbody>
-        {Object.entries(hsnTotals).map(([hsn, data]) => (
-          <tr key={`${hsn}-${data.gstRate || 0}`} className='hover:bg-gray-50'>
-            <td className='py-2 px-4 border-b border-gray-200'>{hsn}</td>
-            <td className='py-2 px-4 border-b border-gray-200 text-right'>
-              {Number(data?.gstRate || 0).toFixed(2)}%
-            </td>
-            <td className='py-2 px-4 border-b border-gray-200 text-right'>
-              ₹{Number(data?.gstAmount || 0).toFixed(2)}
-            </td>
-            <td className='py-2 px-4 border-b border-gray-200 text-right'>
-              ₹{Number(data?.total || 0).toFixed(2)}
-            </td>
-          </tr>
+                <td className='py-2 px-4 border border-gray-300'>{items.gstRate || 0}</td>
+                <td className='py-2 px-4 border border-gray-300'>{items.total ? items.total.toFixed(2) : 0}</td>
+                <td className='py-2 px-4 border border-gray-300'>
+                    <button 
+                        className='bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600' 
+                        onClick={() => handleRemove(index)}
+                    >
+                        Remove
+                    </button>
+                </td>
+            </tr>
         ))}
-      </tbody>
-
-      <tfoot className='bg-gray-50 font-semibold'>
-        <tr>
-          <td className='py-2 px-4 text-right' colSpan={2}>Grand Total</td>
-          <td className='py-2 px-4 text-right'>
-            ₹{Object.values(hsnTotals)
-              .reduce((sum, d) => sum + Number(d?.gstAmount || 0), 0)
-              .toFixed(2)}
-          </td>
-          <td className='py-2 px-4 text-right'>
-            ₹{Object.values(hsnTotals)
-              .reduce((sum, d) => sum + Number(d?.total || 0), 0)
-              .toFixed(2)}
-          </td>
-        </tr>
-      </tfoot>
-    </table>
+    </tbody>
+</table>
   </div>
 </div>
 
