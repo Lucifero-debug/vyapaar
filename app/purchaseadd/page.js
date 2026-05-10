@@ -10,9 +10,7 @@ export const dynamic = 'force-dynamic';
 
 const page = () => {
     const router = useRouter()
-    const searchParams = useSearchParams();
 
-  const paramValue = searchParams.get("value");
    const [value, setValue] = useState('');
    const [hsnTotals, setHsnTotals] = useState({});
    const [isValueReady,setIsValueReady]=useState(false)
@@ -69,11 +67,6 @@ const [noOfPack, setNoOfPack] = useState(0);
         return new Date(dateString).toISOString().substring(0, 10)
     }
 
-  useEffect(() => {
-    if (paramValue) {
-      setValue(paramValue);
-    }
-  }, [paramValue]);
 
 useEffect(() => {
   if (value) return;
@@ -372,6 +365,7 @@ const cost = Number(
                 custId: selectedCustomer._id
             },
             // FIX 4: 'return' is a reserved word — must be quoted as a key
+            'return': false,
             paymentType,
             balanceDue,
             stateOfSupply,
