@@ -116,10 +116,33 @@ useEffect(() => {
                 console.log("transformer", data)
 
                 // FIX 1: normalizedItems defined before use
-                const normalizedItems = (data.items || []).map((item) => ({
-                    ...item,
-                    gstRate: item.gstRate || item.gst || 0,
-                }));
+       const normalizedItems = (data.items || []).map((item) => {
+  const cost = Number(item.cost || item.salePrice || 0);
+  const quantity = Number(item.quantity || 0);
+  const discount = Number(item.discount || 0);
+  const gstRate = Number(item.gstRate || item.gst || 0);
+
+  const baseAmount = cost * quantity;
+  const discountAmount = (baseAmount * discount) / 100;
+  const taxableAmount =
+    item.taxableAmount ?? (baseAmount - discountAmount);
+
+  const gstAmount =
+    item.gstAmount ??
+    (taxableAmount * gstRate) / 100;
+
+  const total =
+    item.total ??
+    (taxableAmount + gstAmount);
+
+  return {
+    ...item,
+    gstRate,
+    taxableAmount,
+    gstAmount,
+    total,
+  };
+});
 
                 // FIX 2: removed duplicate setGst; only set once using normalizedItems
                 setGst(data.gst || normalizedItems.reduce((sum, i) => sum + (i.gstAmount || 0), 0));
@@ -139,11 +162,47 @@ useEffect(() => {
                 setRate(data.rate || '');
                 setDiscount(data.items?.discount || 0);
                 setTaxType(data.taxType || 'local');
-                setPartyTaxes(data.partyTaxes || []);
-                const hsnTotalsObject = (data.hsnTotals || []).reduce((acc, { hsn, amount }) => {
-                    acc[hsn] = amount;
-                    return acc;
-                }, {});
+const parsedPartyTaxes =
+  typeof data.partyTaxes === "string"
+    ? JSON.parse(data.partyTaxes || "[]")
+    : (data.partyTaxes || []);
+
+const normalizedPartyTaxes = parsedPartyTaxes.map((tax) => {
+  const base = (data.items || []).reduce(
+    (sum, item) => sum + Number(item.total || 0),
+    0
+  );
+
+  const rate = Number(tax.rate || 0);
+
+  const total =
+    tax.total ??
+    (rate ? (base * rate) / 100 : Number(tax.amount || 0));
+
+  // THIS IS THE IMPORTANT FIX
+  const amount =
+  rate?"":tax.total;
+
+  return {
+    ...tax,
+    amount,
+    total: Number(total).toFixed(2),
+  };
+});
+
+setPartyTaxes(normalizedPartyTaxes);
+
+const hsnTotalsObject = (data.hsnTotals || []).reduce(
+  (acc, row) => {
+    acc[row.hsn] = {
+      gstRate: Number(row.gstRate || 0),
+      gstAmount: Number(row.amount || 0),
+      total: Number(row.total || 0),
+    };
+    return acc;
+  },
+  {}
+);
                 setHsnTotals(hsnTotalsObject || {});
                 setHsn(data.items?.hsn || '')
                 setTransport(data.transport || '');
@@ -177,36 +236,37 @@ useEffect(() => {
 
 const addPartyTax = () => {
   if (!newTaxName || (!newTaxRate && !newTaxAmount)) {
-    alert('Enter Tax Name and either Rate or Amount');
+    alert("Enter Tax Name and either Rate or Amount");
     return;
   }
 
   if (newTaxRate && newTaxAmount) {
-    alert('Use either Rate or Amount, not both');
+    alert("Use either Rate or Amount, not both");
     return;
   }
 
-  // FIX 3: use actual totalAmount as base instead of hardcoded 1000
-  const base = parseFloat(totalAmount) || 0;
+  // REAL invoice base amount
+  const base = selectedItem.reduce(
+    (sum, item) => sum + Number(item.total || 0),
+    0
+  );
+
   const taxTotal = newTaxRate
-    ? (base * parseFloat(newTaxRate)) / 100
-    : parseFloat(newTaxAmount);
+    ? (base * Number(newTaxRate)) / 100
+    : Number(newTaxAmount || 0);
 
   const newTax = {
     name: newTaxName,
-    rate: newTaxRate || '',
-    amount: newTaxAmount || '',
+    rate: newTaxRate || "",
+    amount: taxTotal.toFixed(2), // important
     total: taxTotal.toFixed(2),
   };
 
-  setPartyTaxes(prev => {
-    const updated = [...prev, newTax];
-    return updated;
-  });
+  setPartyTaxes((prev) => [...prev, newTax]);
 
-  setNewTaxName('');
-  setNewTaxRate('');
-  setNewTaxAmount('');
+  setNewTaxName("");
+  setNewTaxRate("");
+  setNewTaxAmount("");
 };
 
 
@@ -261,7 +321,9 @@ useEffect(() => {
 
     selectedItem.forEach(item => {
         const hsn = item.hsn || "N/A";
-        const cost = Number(item.salePrice) || 0;
+const cost = Number(
+  item.salePrice || item.cost || 0
+);
         const qty = Number(item.quantity) || 0;
         const discount = Number(item.discount) || 0;
         const gstRate = Number(item.gst || item.gstRate || 0);
@@ -310,7 +372,6 @@ useEffect(() => {
                 custId: selectedCustomer._id
             },
             // FIX 4: 'return' is a reserved word — must be quoted as a key
-            'return': true,
             paymentType,
             balanceDue,
             stateOfSupply,
@@ -324,6 +385,7 @@ useEffect(() => {
             shippedTo,
             dispatchFrom,
             type: "Purchase",
+            "return": true,
             transport,
             grNo,
             grDate,
@@ -1037,32 +1099,23 @@ const saveItem = (e) => {
                             <thead>
                                 <tr className='bg-blue-100 text-gray-700 uppercase text-sm leading-normal'>
                                     <th className='py-2 px-4 border border-gray-300'>HSN Code</th>
-                                    <th className='py-2 px-4 border border-gray-300'>Taxable Amount</th> 
+                                    <th className='py-2 px-4 border border-gray-300'>Taxable Amount</th>
                                     <th className='py-2 px-4 border border-gray-300'>GST (%)</th>
+                                    <th className='py-2 px-4 border border-gray-300'>GST Amount</th>
                                     <th className='py-2 px-4 border border-gray-300'>Total</th>
-                                    <th className='py-2 px-4 border border-gray-300'>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {selectedItem.map((items, index) => (
-                                    <tr key={index} className='even:bg-gray-50 odd:bg-white'>
-                                        <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
+                                {/* FIX: iterate hsnTotals (grouped by HSN) not selectedItem (one row per item) */}
+                                {Object.entries(hsnTotals).map(([hsnCode, data]) => (
+                                    <tr key={hsnCode} className='even:bg-gray-50 odd:bg-white'>
+                                        <td className='py-2 px-4 border border-gray-300'>{hsnCode}</td>
                                         <td className='py-2 px-4 border border-gray-300 font-medium text-gray-700'>
-                                            {items.taxableAmount 
-                                                ? items.taxableAmount.toFixed(2) 
-                                                : ((items.cost * items.quantity) - ((items.cost * items.quantity * (items.discount || 0)) / 100)).toFixed(2)
-                                            }
+                                            {((data.total || 0) - (data.gstAmount || 0)).toFixed(2)}
                                         </td>
-                                        <td className='py-2 px-4 border border-gray-300'>{items.gstRate || 0}</td>
-                                        <td className='py-2 px-4 border border-gray-300'>{items.total ? items.total.toFixed(2) : 0}</td>
-                                        <td className='py-2 px-4 border border-gray-300'>
-                                            <button 
-                                                className='bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600' 
-                                                onClick={() => handleRemove(index)}
-                                            >
-                                                Remove
-                                            </button>
-                                        </td>
+                                        <td className='py-2 px-4 border border-gray-300'>{data.gstRate || 0}</td>
+                                        <td className='py-2 px-4 border border-gray-300'>{(data.gstAmount || 0).toFixed(2)}</td>
+                                        <td className='py-2 px-4 border border-gray-300'>{(data.total || 0).toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1121,10 +1174,10 @@ const saveItem = (e) => {
                                     <tr key={`${tax.name}-${index}`} className='even:bg-gray-50 odd:bg-white'>
                                         <td className='border border-black px-2 py-1'>{tax.name}</td>
                                         <td className='border border-black px-2 py-1'>
-                                            {tax.rate ? `${tax.rate}%` : 'NA'}
+                                            {tax.rate !== '' ? `${tax.rate}%` : 'NA'}
                                         </td>
                                         <td className='border border-black px-2 py-1'>
-                                            {tax.amount ? `₹${tax.amount}` : 'NA'}
+                                            {tax.amount !== '' ? `₹${tax.amount}` : 'NA'}
                                         </td>
                                         <td className='border border-black px-2 py-1'>{tax.total}</td>
                                         <td className='border border-black px-2 py-1'>
