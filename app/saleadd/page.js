@@ -67,6 +67,37 @@ const [noOfPack, setNoOfPack] = useState(0);
         return new Date(dateString).toISOString().substring(0, 10)
     }
 
+    // ─── Helper: rebuild HSN totals from an items array ───────────────────────
+    const buildHsnTotals = (items) => {
+        const grouped = {};
+        items.forEach(item => {
+            const hsn = item.hsn || 'N/A';
+            if (!grouped[hsn]) {
+                grouped[hsn] = { gstRate: item.gstRate, gstAmount: 0, total: 0 };
+            }
+            grouped[hsn].gstAmount += Number(item.gstAmount) || 0;
+            grouped[hsn].total     += Number(item.total)     || 0;
+        });
+        return grouped;
+    };
+
+    // ─── Helper: recalculate a single item's derived fields ───────────────────
+    const recalcItem = (item) => {
+        // FIX 1: always prefer item.cost over item.salePrice so edited values are respected
+        const cost        = Number(item.cost || item.salePrice || 0);
+        const qty         = Number(item.quantity) || 0;
+        const discountPct = Number(item.discount)  || 0;
+        const gstRate     = Number(item.gstRate)   || 0;
+
+        const baseAmount      = cost * qty;
+        const discountAmount  = (baseAmount * discountPct) / 100;
+        const taxableAmount   = baseAmount - discountAmount;
+        const gstAmount       = (taxableAmount * gstRate) / 100;
+        const total           = taxableAmount + gstAmount;
+
+        return { ...item, cost, taxableAmount, gstAmount, total };
+    };
+
 
 useEffect(() => {
   if (value) return;
@@ -108,36 +139,21 @@ useEffect(() => {
                 const data = res.final;
                 console.log("transformer", data)
 
-                // FIX 1: normalizedItems defined before use
-       const normalizedItems = (data.items || []).map((item) => {
-  const cost = Number(item.cost || item.salePrice || 0);
-  const quantity = Number(item.quantity || 0);
-  const discount = Number(item.discount || 0);
-  const gstRate = Number(item.gstRate || item.gst || 0);
+                const normalizedItems = (data.items || []).map((item) => {
+                    const cost      = Number(item.cost || item.salePrice || 0);
+                    const quantity  = Number(item.quantity || 0);
+                    const discount  = Number(item.discount || 0);
+                    const gstRate   = Number(item.gstRate || item.gst || 0);
 
-  const baseAmount = cost * quantity;
-  const discountAmount = (baseAmount * discount) / 100;
-  const taxableAmount =
-    item.taxableAmount ?? (baseAmount - discountAmount);
+                    const baseAmount      = cost * quantity;
+                    const discountAmount  = (baseAmount * discount) / 100;
+                    const taxableAmount   = item.taxableAmount ?? (baseAmount - discountAmount);
+                    const gstAmount       = item.gstAmount     ?? (taxableAmount * gstRate) / 100;
+                    const total           = item.total         ?? (taxableAmount + gstAmount);
 
-  const gstAmount =
-    item.gstAmount ??
-    (taxableAmount * gstRate) / 100;
+                    return { ...item, cost, gstRate, taxableAmount, gstAmount, total };
+                });
 
-  const total =
-    item.total ??
-    (taxableAmount + gstAmount);
-
-  return {
-    ...item,
-    gstRate,
-    taxableAmount,
-    gstAmount,
-    total,
-  };
-});
-
-                // FIX 2: removed duplicate setGst; only set once using normalizedItems
                 setGst(data.gst || normalizedItems.reduce((sum, i) => sum + (i.gstAmount || 0), 0));
                 setInvoiceNo(data.invoiceNo || 4);
                 setDate(data.date ? formatDate(data.date) : new Date().toISOString().substring(0, 10));
@@ -155,47 +171,35 @@ useEffect(() => {
                 setRate(data.rate || '');
                 setDiscount(data.items?.discount || 0);
                 setTaxType(data.taxType || 'local');
-const parsedPartyTaxes =
-  typeof data.partyTaxes === "string"
-    ? JSON.parse(data.partyTaxes || "[]")
-    : (data.partyTaxes || []);
 
-const normalizedPartyTaxes = parsedPartyTaxes.map((tax) => {
-  const base = (data.items || []).reduce(
-    (sum, item) => sum + Number(item.total || 0),
-    0
-  );
+                const parsedPartyTaxes =
+                    typeof data.partyTaxes === "string"
+                        ? JSON.parse(data.partyTaxes || "[]")
+                        : (data.partyTaxes || []);
 
-  const rate = Number(tax.rate || 0);
+                const normalizedPartyTaxes = parsedPartyTaxes.map((tax) => {
+                    const base = (data.items || []).reduce(
+                        (sum, item) => sum + Number(item.total || 0),
+                        0
+                    );
+                    const taxRate  = Number(tax.rate || 0);
+                    const total    = tax.total ?? (taxRate ? (base * taxRate) / 100 : Number(tax.amount || 0));
+                    const amount   = taxRate ? "" : tax.total;
 
-  const total =
-    tax.total ??
-    (rate ? (base * rate) / 100 : Number(tax.amount || 0));
+                    return { ...tax, amount, total: Number(total).toFixed(2) };
+                });
 
-  // THIS IS THE IMPORTANT FIX
-  const amount =
-  rate?"":tax.total;
+                setPartyTaxes(normalizedPartyTaxes);
 
-  return {
-    ...tax,
-    amount,
-    total: Number(total).toFixed(2),
-  };
-});
+                const hsnTotalsObject = (data.hsnTotals || []).reduce((acc, row) => {
+                    acc[row.hsn] = {
+                        gstRate:   Number(row.gstRate || 0),
+                        gstAmount: Number(row.amount  || 0),
+                        total:     Number(row.total   || 0),
+                    };
+                    return acc;
+                }, {});
 
-setPartyTaxes(normalizedPartyTaxes);
-
-const hsnTotalsObject = (data.hsnTotals || []).reduce(
-  (acc, row) => {
-    acc[row.hsn] = {
-      gstRate: Number(row.gstRate || 0),
-      gstAmount: Number(row.amount || 0),
-      total: Number(row.total || 0),
-    };
-    return acc;
-  },
-  {}
-);
                 setHsnTotals(hsnTotalsObject || {});
                 setHsn(data.items?.hsn || '')
                 setTransport(data.transport || '');
@@ -227,6 +231,48 @@ const hsnTotalsObject = (data.hsnTotals || []).reduce(
         }
     }, [customerLoaded, customer]);
 
+    // ─── FIX 2: Rebuild HSN totals from selectedItem whenever it changes ──────
+    // This replaces the old useEffect that used item.salePrice instead of item.cost
+    useEffect(() => {
+        const grouped = buildHsnTotals(selectedItem);
+        setHsnTotals(grouped);
+
+        const totalGst = selectedItem.reduce((sum, i) => sum + (Number(i.gstAmount) || 0), 0);
+        setGst(totalGst);
+    }, [selectedItem]);
+
+    // ─── FIX 3: Recalculate rate-based party taxes when items change ──────────
+useEffect(() => {
+    if (partyTaxes.length === 0) return;
+
+    const base = selectedItem.reduce(
+        (sum, i) => sum + Number(i.total || 0),
+        0
+    );
+
+    let changed = false;
+
+    const updatedTaxes = partyTaxes.map((tax) => {
+        if (!tax.rate) return tax;
+
+        const total = ((base * Number(tax.rate)) / 100).toFixed(2);
+
+        if (tax.total !== total) {
+            changed = true;
+            return {
+                ...tax,
+                total,
+            };
+        }
+
+        return tax;
+    });
+
+    if (changed) {
+        setPartyTaxes(updatedTaxes);
+    }
+}, [selectedItem]);
+
 const addPartyTax = () => {
   if (!newTaxName || (!newTaxRate && !newTaxAmount)) {
     alert("Enter Tax Name and either Rate or Amount");
@@ -238,7 +284,6 @@ const addPartyTax = () => {
     return;
   }
 
-  // REAL invoice base amount
   const base = selectedItem.reduce(
     (sum, item) => sum + Number(item.total || 0),
     0
@@ -251,7 +296,7 @@ const addPartyTax = () => {
   const newTax = {
     name: newTaxName,
     rate: newTaxRate || "",
-    amount: taxTotal.toFixed(2), // important
+    amount: newTaxRate ? "" : taxTotal.toFixed(2),
     total: taxTotal.toFixed(2),
   };
 
@@ -263,21 +308,12 @@ const addPartyTax = () => {
 };
 
 
-    // Handle remove item
+    // ─── FIX 4: handleRemove now properly rebuilds HSN totals ─────────────────
     const handleRemove = (indexToRemove) => {
         const updatedItems = selectedItem.filter((_, index) => index !== indexToRemove);
         setSelectedItem(updatedItems);
-        const newTotal = updatedItems.reduce((acc, curr) => acc + curr.total, 0);
-        setTotalAmount(newTotal.toFixed(2));
-
-        // Recalculate HSN Totals
-        const groupedByHSN = {};
-        updatedItems.forEach(item => {
-            const hsn = item.hsn || 'N/A';
-            groupedByHSN[hsn] = (groupedByHSN[hsn] || 0) + item.total;
-        });
-        setHsnTotals(groupedByHSN);
-    }
+        // totalAmount, hsnTotals and gst will update via their respective useEffects above
+    };
 
     // Fetch items and customers
     useEffect(() => {
@@ -309,81 +345,149 @@ const addPartyTax = () => {
         fetchItem()
     }, [])
 
-useEffect(() => {
-    const groupedByHSN = {};
+    // Calculate totals
+    useEffect(() => {
+        const newTotal = selectedItem.reduce((acc, item) => acc + (parseFloat(item.total) || 0), 0);
+        setTotalAmount(newTotal.toFixed(2));
+    }, [selectedItem]);
 
-    selectedItem.forEach(item => {
-        const hsn = item.hsn || "N/A";
-const cost = Number(
-  item.salePrice || item.cost || 0
-);
-        const qty = Number(item.quantity) || 0;
-        const discount = Number(item.discount) || 0;
-        const gstRate = Number(item.gst || item.gstRate || 0);
+    // GST and Final Amount
+    useEffect(() => {
+        const baseAmount     = parseFloat(totalAmount) || 0;
+        const partyTaxTotal  = partyTaxes.reduce((acc, tax) => acc + parseFloat(tax.total || 0), 0);
+        const finalAmt       = baseAmount + partyTaxTotal;
 
-        const baseAmount = cost * qty;
-        const discountAmount = (baseAmount * discount) / 100;
-        const taxableBase = baseAmount - discountAmount;
-        const gstAmount = (taxableBase * gstRate) / 100;
-        const total = taxableBase + gstAmount;
+        setFinalAmount(finalAmt.toFixed(2));
 
-        if (!groupedByHSN[hsn]) {
-            groupedByHSN[hsn] = {
-                gstRate,
-                gstAmount: 0,
-                total: 0
-            };
-        }
+        const receivedAmt = parseFloat(received) || 0;
+        const balance     = parseFloat((finalAmt - receivedAmt).toFixed(2));
+        setBalanceDue(balance);
+    }, [totalAmount, gst, partyTaxes, received]);
 
-        groupedByHSN[hsn].gstAmount += gstAmount;
-        groupedByHSN[hsn].total += total;
+    const handleTaxTypeChange = (e) => {
+        setTaxType(e.target.value);
+    };
+
+    // ─── Helper: build a new item object from source item + overrides ─────────
+    const buildNewItem = (sourceItem, overrides = {}) => {
+        const merged = { ...sourceItem, ...overrides };
+        return recalcItem(merged);
+    };
+
+const saveItem = (e) => {
+    const selectedName  = e.target.value;
+    const selectedItems = item.find((i) => i.name === selectedName);
+    if (!selectedItems) return;
+
+    setItemName(selectedName);
+
+    if (options.description) {
+        setShowDescPopup(true);
+        return;
+    }
+
+    if (options.calculateByPack) {
+        setShowQuantityPack(true);
+        return;
+    }
+
+    const newItem = buildNewItem(selectedItems, {
+        quantity: Number(quantity || 1),
+        cost:     Number(rate || selectedItems.salePrice),
+        discount: Number(discount || selectedItems.discount || 0),
+        gstRate:  Number(selectedItems.gst || selectedItems.gstRate || 0),
     });
 
-    setHsnTotals(groupedByHSN);
-}, [selectedItem]); 
+    setSelectedItem(prev => [...prev, newItem]);
+
+    setItemName('');
+    setQuantity('');
+    setRate('');
+    setDiscount(0);
+};
+
+   const handleSaveDescription = () => {
+    const selectedItems = item.find((i) => i.name === itemName);
+    if (!selectedItems) return;
+
+    const newItem = buildNewItem(selectedItems, {
+        description: descriptionText,
+        quantity:    Number(quantity || 1),
+        cost:        Number(rate || selectedItems.salePrice),
+        discount:    Number(discount || selectedItems.discount || 0),
+        gstRate:     Number(selectedItems.gst || selectedItems.gstRate || 0),
+    });
+
+    setSelectedItem(prev => [...prev, newItem]);
+
+    setShowDescPopup(false);
+    setItemName('');
+    setQuantity('');
+    setRate('');
+    setDiscount(0);
+    setDescriptionText('');
+};
+
+   const handleQuantityPackSave = () => {
+    const selectedItems = item.find((i) => i.name === itemName);
+    if (!selectedItems) return;
+
+    const newItem = buildNewItem(selectedItems, {
+        description: descriptionText,
+        quantity:    Number(noOfPack) * Number(quantityPerPack),
+        cost:        Number(rate || selectedItems.salePrice),
+        discount:    Number(discount || selectedItems.discount || 0),
+        gstRate:     Number(selectedItems.gst || selectedItems.gstRate || 0),
+    });
+
+    setSelectedItem(prev => [...prev, newItem]);
+
+    setShowQuantityPack(false);
+    setNoOfPack(0);
+    setQuantityPerPack(0);
+};
 
     // Save invoice function
     const submitInvoice = async () => {
-        const encodedItems = encodeURIComponent(JSON.stringify(selectedItem));
-        const encodedParty = encodeURIComponent(JSON.stringify(partyTaxes));
+        const encodedItems     = encodeURIComponent(JSON.stringify(selectedItem));
+        const encodedParty     = encodeURIComponent(JSON.stringify(partyTaxes));
         const encodedHsnTotals = encodeURIComponent(JSON.stringify(hsnTotals));
-        const phone = selectedCustomer.phone;
-        const hsnTotalsArray = Object.entries(hsnTotals).map(([hsn, data]) => ({
+        const phone            = selectedCustomer.phone;
+        const hsnTotalsArray   = Object.entries(hsnTotals).map(([hsn, data]) => ({
             hsn,
             gstRate: data.gstRate,
-            amount: data.gstAmount,
-            total: data.total
+            amount:  data.gstAmount,
+            total:   data.total
         }));
 
         const invoiceData = {
             invoiceNo,
             date,
             customer: {
-                name: selectedCustomer.name,
-                phone: phone,
-                email: selectedCustomer.email,
+                name:   selectedCustomer.name,
+                phone:  phone,
+                email:  selectedCustomer.email,
                 custId: selectedCustomer._id
             },
-            // FIX 4: 'return' is a reserved word — must be quoted as a key
             'return': false,
             paymentType,
             balanceDue,
             stateOfSupply,
             taxType,
             gst,
-            totalAmount: Number(totalAmount),
-            finalAmount: Number(finalAmount),
-            received: Number(received) || 0,
-            items: selectedItem,
-            partyTaxes: partyTaxes,
+            totalAmount:  Number(totalAmount),
+            finalAmount:  Number(finalAmount),
+            received:     Number(received) || 0,
+            items:        selectedItem,
+            partyTaxes:   partyTaxes,
             shippedTo,
             dispatchFrom,
-            type: "Sale",
+            type:         "Sale",
             transport,
             grNo,
             grDate,
             pvtMark,
-            hsnTotals: hsnTotalsArray,
+            hsnTotals:    hsnTotalsArray,
             caseDetails,
             freight,
             weight,
@@ -397,9 +501,7 @@ const cost = Number(
             const apiRoute = value ? '/api/sale-alter' : '/api/save-invoice';
             const response = await fetch(apiRoute, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(invoiceData),
             });
 
@@ -415,14 +517,14 @@ const cost = Number(
                     phone,
                     totalAmount,
                     finalAmount,
-                    received: received || 0,
+                    received:     received || 0,
                     balanceDue,
                     paymentType,
                     stateOfSupply,
                     taxType,
                     gst,
-                    items: encodedItems,
-                    partyTaxes: encodedParty,
+                    items:        encodedItems,
+                    partyTaxes:   encodedParty,
                     shippedTo,
                     dispatchFrom,
                     transport,
@@ -436,7 +538,7 @@ const cost = Number(
                     ewayBillDate,
                     orderNo,
                     orderDate,
-                    hsnTotals: encodedHsnTotals
+                    hsnTotals:    encodedHsnTotals
                 }).toString();
 
                 router.push(`/invoice?${query}`);
@@ -454,12 +556,10 @@ const cost = Number(
             setShowShippedPopup(true);
             return;
         }
-
         if (options.dispatch) {
             setShowDispatchPopup(true);
             return;
         }
-
         submitInvoice();
     };
 
@@ -477,203 +577,18 @@ const handleDispatchSave = () => {
     submitInvoice();
 };
 
-    // Calculate totals
-    useEffect(() => {
-        const newTotal = selectedItem.reduce((acc, item) => acc + (parseFloat(item.total) || 0), 0);
-        setTotalAmount(newTotal.toFixed(2));
-    }, [selectedItem]);
-
-// GST and Final Amount
-useEffect(() => {
-    const baseAmount = parseFloat(totalAmount) || 0;
-    const partyTaxTotal = partyTaxes.reduce((acc, tax) => acc + parseFloat(tax.total || 0), 0);
-
-    const finalAmt = baseAmount + partyTaxTotal;
-    setFinalAmount(finalAmt.toFixed(2));
-
-    const receivedAmt = parseFloat(received) || 0;
-    const balance = parseFloat((finalAmt - receivedAmt).toFixed(2));
-    setBalanceDue(balance);
-}, [totalAmount, gst, partyTaxes, received]);
-
-    const handleTaxTypeChange = (e) => {
-        setTaxType(e.target.value);
+    // ─── Inline item field change handler (quantity / cost / discount) ────────
+    // FIX 5: single handler that always uses recalcItem so all three fields
+    //        cascade correctly through taxableAmount → gstAmount → total
+    const handleItemFieldChange = (index, field, rawValue) => {
+        setSelectedItem(prev =>
+            prev.map((item, idx) => {
+                if (idx !== index) return item;
+                const updated = { ...item, [field]: parseFloat(rawValue) || 0 };
+                return recalcItem(updated);
+            })
+        );
     };
-
-const saveItem = (e) => {
-    const selectedName = e.target.value;
-    const selectedItems = item.find((i) => i.name === selectedName);
-    if (!selectedItems) return;
-
-    // FIX 5: setItemName before opening popups so handleSaveDescription / handleQuantityPackSave can find the item
-    setItemName(selectedName);
-
-    if (options.description) {
-        setShowDescPopup(true);
-        return;
-    }
-
-    if (options.calculateByPack) {
-        setShowQuantityPack(true);
-        return;
-    }
-
-    const rateValue = Number(rate || selectedItems.salePrice);
-    const quantityValue = Number(quantity || 1);
-    const discountValue = Number(discount || selectedItems.discount || 0);
-    const gstRate = Number(selectedItems.gst || selectedItems.gstRate || 0);
-
-    const baseAmount = rateValue * quantityValue;
-    const discountAmount = (baseAmount * discountValue) / 100;
-    const taxableAmount = baseAmount - discountAmount;
-    const gstAmount = (taxableAmount * gstRate) / 100;
-    const total = taxableAmount + gstAmount;
-
-    const newItem = {
-        ...selectedItems,
-        quantity: quantityValue,
-        cost: rateValue,
-        discount: discountValue,
-        gstRate,
-        taxableAmount,
-        gstAmount,
-        total,
-    };
-
-    const updatedItems = [...selectedItem, newItem];
-    setSelectedItem(updatedItems);
-
-    let totalGst = 0;
-    const groupedByHSN = {};
-    updatedItems.forEach(item => {
-        const hsn = item.hsn || 'N/A';
-        totalGst += item.gstAmount || 0;
-
-        if (!groupedByHSN[hsn]) {
-            groupedByHSN[hsn] = { gstRate: item.gstRate, gstAmount: 0, total: 0 };
-        }
-        groupedByHSN[hsn].gstAmount += item.gstAmount || 0;
-        groupedByHSN[hsn].total += item.total || 0;
-    });
-
-    setHsnTotals(groupedByHSN);
-    setGst(totalGst);
-
-    setItemName('');
-    setQuantity('');
-    setRate('');
-    setDiscount(0);
-};
-
-   const handleSaveDescription = () => {
-    const selectedItems = item.find((i) => i.name === itemName);
-    if (!selectedItems) return;
-
-    const rateValue = Number(rate || selectedItems.salePrice);
-    const quantityValue = Number(quantity || 1);
-    const discountValue = Number(discount || selectedItems.discount || 0);
-
-    // FIX 6: selectedItems.hsn is a string code, not an object — read gst from selectedItems directly
-    const gstRate = Number(selectedItems.gst || selectedItems.gstRate || 0);
-
-    const baseAmount = rateValue * quantityValue;
-    const discountAmount = (baseAmount * discountValue) / 100;
-    const taxableAmount = baseAmount - discountAmount;
-    const gstAmount = (taxableAmount * gstRate) / 100;
-    const total = taxableAmount + gstAmount;
-
-    const newItem = {
-        ...selectedItems,
-        description: descriptionText,
-        quantity: quantityValue,
-        cost: rateValue,
-        discount: discountValue,
-        gstRate,
-        taxableAmount,
-        gstAmount,
-        total,
-    };
-
-    const updatedItems = [...selectedItem, newItem];
-    setSelectedItem(updatedItems);
-
-    let totalGst = 0;
-    const groupedByHSN = {};
-    updatedItems.forEach(item => {
-        const hsn = item.hsn || 'N/A';
-        totalGst += item.gstAmount || 0;
-
-        if (!groupedByHSN[hsn]) {
-            groupedByHSN[hsn] = { gstRate: item.gstRate, gstAmount: 0, total: 0 };
-        }
-        groupedByHSN[hsn].gstAmount += item.gstAmount || 0;
-        groupedByHSN[hsn].total += item.total || 0;
-    });
-
-    setHsnTotals(groupedByHSN);
-    setGst(totalGst);
-
-    setShowDescPopup(false);
-    setItemName('');
-    setQuantity('');
-    setRate('');
-    setDiscount(0);
-    setDescriptionText('');
-};
-
-   const handleQuantityPackSave = () => {
-    const selectedItems = item.find((i) => i.name === itemName);
-    if (!selectedItems) return;
-
-    const rateValue = Number(rate || selectedItems.salePrice);
-    const quantityValue = Number(noOfPack) * Number(quantityPerPack);
-    const discountValue = Number(discount || selectedItems.discount || 0);
-
-    // FIX 6 (same): selectedItems.hsn is a string, read gst from selectedItems directly
-    const gstRate = Number(selectedItems.gst || selectedItems.gstRate || 0);
-
-    const baseAmount = rateValue * quantityValue;
-    const discountAmount = (baseAmount * discountValue) / 100;
-    const taxableAmount = baseAmount - discountAmount;
-    const gstAmount = (taxableAmount * gstRate) / 100;
-    const total = taxableAmount + gstAmount;
-
-    const newItem = {
-        ...selectedItems,
-        description: descriptionText,
-        quantity: quantityValue,
-        cost: rateValue,
-        discount: discountValue,
-        gstRate,
-        taxableAmount,
-        gstAmount,
-        total,
-    };
-
-    const updatedItems = [...selectedItem, newItem];
-    setSelectedItem(updatedItems);
-
-    let totalGst = 0;
-    const groupedByHSN = {};
-    updatedItems.forEach(item => {
-        const hsn = item.hsn || 'N/A';
-        totalGst += item.gstAmount || 0;
-
-        if (!groupedByHSN[hsn]) {
-            groupedByHSN[hsn] = { gstRate: item.gstRate, gstAmount: 0, total: 0 };
-        }
-        groupedByHSN[hsn].gstAmount += item.gstAmount || 0;
-        groupedByHSN[hsn].total += item.total || 0;
-    });
-
-    setHsnTotals(groupedByHSN);
-    setGst(totalGst);
-
-    setShowQuantityPack(false);
-    setNoOfPack(0);
-    setQuantityPerPack(0);
-};
-
 
     return (
         <>
@@ -870,29 +785,7 @@ const saveItem = (e) => {
                                                     min='1' 
                                                     className='w-16 px-2 border rounded' 
                                                     value={items.quantity} 
-                                                    onChange={(e) => {
-                                                        const newQuantity = parseFloat(e.target.value) || 0;
-                                                        setSelectedItem(prev =>
-                                                            prev.map((item, idx) => {
-                                                                if (idx === index) {
-                                                                    const subtotal = item.cost * newQuantity;
-                                                                    const discountAmount = (subtotal * (item.discount || 0)) / 100;
-                                                                    const taxableAmount = subtotal - discountAmount;
-                                                                    // FIX 7: use item.gstRate (stored field) not item.gst
-                                                                    const gstAmount = (taxableAmount * (item.gstRate || 0)) / 100;
-                                                                    const newTotal = taxableAmount + gstAmount;
-                                                                    return { 
-                                                                        ...item, 
-                                                                        quantity: newQuantity,
-                                                                        gstAmount,
-                                                                        total: newTotal,
-                                                                        taxableAmount
-                                                                    };
-                                                                }
-                                                                return item;
-                                                            })
-                                                        );
-                                                    }} 
+                                                    onChange={(e) => handleItemFieldChange(index, 'quantity', e.target.value)}
                                                 />
                                             </td>
                                             <td className='py-2 px-4 border border-gray-300'>
@@ -901,29 +794,7 @@ const saveItem = (e) => {
                                                     min='0' 
                                                     className='w-20 px-2 border rounded' 
                                                     value={items.cost} 
-                                                    onChange={(e) => {
-                                                        const newCost = parseFloat(e.target.value) || 0;
-                                                        setSelectedItem(prev =>
-                                                            prev.map((item, idx) => {
-                                                                if (idx === index) {
-                                                                    const subtotal = newCost * item.quantity;
-                                                                    const discountAmount = (subtotal * (item.discount || 0)) / 100;
-                                                                    const taxableAmount = subtotal - discountAmount;
-                                                                    // FIX 7: use item.gstRate
-                                                                    const gstAmount = (taxableAmount * (item.gstRate || 0)) / 100;
-                                                                    const newTotal = taxableAmount + gstAmount;
-                                                                    return { 
-                                                                        ...item, 
-                                                                        cost: newCost,
-                                                                        gstAmount,
-                                                                        total: newTotal,
-                                                                        taxableAmount
-                                                                    };
-                                                                }
-                                                                return item;
-                                                            })
-                                                        );
-                                                    }} 
+                                                    onChange={(e) => handleItemFieldChange(index, 'cost', e.target.value)}
                                                 />
                                             </td>
                                             <td className='py-2 px-4 border border-gray-300'>
@@ -933,33 +804,11 @@ const saveItem = (e) => {
                                                     max='100'
                                                     className='w-16 px-2 border rounded'
                                                     value={items.discount}
-                                                    onChange={(e) => {
-                                                        const newDiscount = parseFloat(e.target.value) || 0;
-                                                        setSelectedItem(prev =>
-                                                            prev.map((item, idx) => {
-                                                                if (idx === index) {
-                                                                    const subtotal = item.cost * item.quantity;
-                                                                    const discountAmount = (subtotal * newDiscount) / 100;
-                                                                    const taxableAmount = subtotal - discountAmount;
-                                                                    // FIX 7: use item.gstRate
-                                                                    const gstAmount = (taxableAmount * (item.gstRate || 0)) / 100;
-                                                                    const newTotal = taxableAmount + gstAmount;
-                                                                    return {
-                                                                        ...item,
-                                                                        discount: newDiscount,
-                                                                        gstAmount,
-                                                                        total: newTotal,
-                                                                        taxableAmount
-                                                                    };
-                                                                }
-                                                                return item;
-                                                            })
-                                                        );
-                                                    }}
+                                                    onChange={(e) => handleItemFieldChange(index, 'discount', e.target.value)}
                                                 />
                                             </td>
                                             <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
-                                            <td className='py-2 px-4 border border-gray-300'>{items.total.toFixed(2)}</td>
+                                            <td className='py-2 px-4 border border-gray-300'>{Number(items.total).toFixed(2)}</td>
                                             <td className='py-2 px-4 border border-gray-300'>
                                                 <button 
                                                     className='bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600' 
@@ -1099,7 +948,6 @@ const saveItem = (e) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {/* FIX: iterate hsnTotals (grouped by HSN) not selectedItem (one row per item) */}
                                 {Object.entries(hsnTotals).map(([hsnCode, data]) => (
                                     <tr key={hsnCode} className='even:bg-gray-50 odd:bg-white'>
                                         <td className='py-2 px-4 border border-gray-300'>{hsnCode}</td>
