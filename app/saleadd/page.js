@@ -1,5 +1,5 @@
 'use client'
-import { useRouter} from 'next/navigation'
+import { useRouter, useSearchParams} from 'next/navigation'
 import React, { Suspense, useEffect, useState } from 'react'
 import AddIcon from '@mui/icons-material/Add';
 // import TotalSale from '@/models/totalSales';
@@ -11,6 +11,10 @@ export const dynamic = 'force-dynamic';
 
 const page = () => {
     const router = useRouter()
+    const searchParams = useSearchParams();
+
+  // get value from URL
+  const paramValue = searchParams.get("value");
    const [value, setValue] = useState('');
    const [hsnTotals, setHsnTotals] = useState({});
    const [isValueReady,setIsValueReady]=useState(false)
@@ -56,7 +60,7 @@ const [noOfPack, setNoOfPack] = useState(0);
     const [itemName, setItemName] = useState('')
     const [quantity, setQuantity] = useState('')
     const [rate, setRate] = useState('')
-    const [discount, setDiscount] = useState('')
+    const [discount, setDiscount] = useState(0)
     const [taxType, setTaxType] = useState('local')
     const [id, setId] = useState('')
     
@@ -69,6 +73,12 @@ const [noOfPack, setNoOfPack] = useState(0);
     const formatDate = (dateString) => {
         return new Date(dateString).toISOString().substring(0, 10)
     }
+
+  useEffect(() => {
+    if (paramValue) {
+      setValue(paramValue);
+    }
+  }, [paramValue]);
 
 useEffect(() => {
   // Don't run until Suspense has resolved the param status
@@ -129,7 +139,7 @@ useEffect(() => {
                 setItemName(data.items?.name || '');
                 setQuantity(data.items?.quantity || '');
                 setRate(data.rate || '');
-                setDiscount(data.items?.discount || '');
+                setDiscount(data.items?.discount || 0);
                 setTaxType(data.taxType || 'local');
                 setPartyTaxes(data.partyTaxes || []);
                 const hsnTotalsObject = data.hsnTotals.reduce((acc, { hsn, amount }) => {
@@ -224,6 +234,7 @@ setHsnTotals(groupedByHSN);
                 const response = await fetch('/api/get-item')
                 const result = await response.json()
                 setItem(result.item)
+                console.log("Fetched Items:", result.item);
             } catch (error) {
                 console.error('Error fetching Item data:', error);
                 alert('Failed to fetch item.');
@@ -251,7 +262,7 @@ const groupedByHSN = {};
 
 selectedItem.forEach(item => {
   const hsn = item.hsn || "N/A";
-  const cost = Number(item.cost) || 0;
+  const cost = Number(item.salePrice) || 0;
   const qty = Number(item.quantity) || 0;
   const discount = Number(item.discount) || 0;
   const gstRate = Number(item.gst || item.gstRate || 0);
@@ -457,9 +468,11 @@ const saveItem = (e) => {
     return;
   }
 
-  const rateValue = Number(rate || selectedItems.cost);
+  const rateValue = Number(rate || selectedItems.salePrice);
   const quantityValue = Number(quantity || 1);
-  const discountValue = Number(discount || 0);
+const discountValue = Number(
+  discount || selectedItems.discount || 0
+);
   const gstRate = Number(selectedItems.gst || selectedItems.gstRate || 0);
 
   const baseAmount = rateValue * quantityValue;
@@ -503,7 +516,7 @@ const saveItem = (e) => {
   setItemName('');
   setQuantity('');
   setRate('');
-  setDiscount('');
+  setDiscount(0);
 };
 
    const handleSaveDescription = () => {
@@ -517,7 +530,9 @@ const saveItem = (e) => {
   const gstRate = selectedItems.hsn?.gst || 0;
   const gstAmount = (subtotal * gstRate) / 100;
   const total = subtotal + gstAmount;
-  const discountValue = Number(discount || 0);
+const discountValue = Number(
+  discount || selectedItems.discount || 0
+);
     const baseAmount = rateValue * quantityValue;
     const discountAmount = (baseAmount * discountValue) / 100;
   const taxableAmount = subtotal - discountAmount;
@@ -557,7 +572,7 @@ setGst(totalGst);
   setItemName('');
   setQuantity('');
   setRate('');
-  setDiscount('');
+  setDiscount(0);
   setDescriptionText('');
 };
 
@@ -572,7 +587,9 @@ setGst(totalGst);
   const gstRate = selectedItems.hsn?.gst || 0;
   const gstAmount = (subtotal * gstRate) / 100;
   const total = subtotal + gstAmount;
-  const discountValue = Number(discount || 0);
+  const discountValue = Number(
+  discount || selectedItems.discount || 0
+);
     const baseAmount = rateValue * quantityValue;
     const discountAmount = (baseAmount * discountValue) / 100;
   const taxableAmount = subtotal - discountAmount;
@@ -795,7 +812,6 @@ setGst(totalGst);
                                     <th className='py-2 px-4 border border-gray-300'>Rate</th>
                                     <th className='py-2 px-4 border border-gray-300'>Discount (%)</th>
                                     <th className='py-2 px-4 border border-gray-300'>HSN Code</th>
-                                    <th className='py-2 px-4 border border-gray-300'>GST</th>
                                     <th className='py-2 px-4 border border-gray-300'>Total</th>
                                     <th className='py-2 px-4 border border-gray-300'>Action</th>
                                 </tr>
@@ -839,7 +855,7 @@ setGst(totalGst);
 <input 
     type='number' 
     min='0' 
-    className='w-16 px-2 border rounded' 
+    className='w-20 px-2 border rounded' 
     value={items.cost} 
     onChange={(e) => {
         const newCost = parseFloat(e.target.value) || 0;
@@ -899,7 +915,6 @@ setGst(totalGst);
 />
                                         </td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
-                                        <td className='py-2 px-4 border border-gray-300'>{items.gstRate || 0}</td>
                                         <td className='py-2 px-4 border border-gray-300'>{items.total.toFixed(2)}</td>
                                         <td className='py-2 px-4 border border-gray-300'>
                                             <button 
