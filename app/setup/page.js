@@ -14,18 +14,27 @@ const Page = () => {
     }));
   };
 
-     const handleClearData = async () => {
-    const confirmed = window.confirm(
-      "Are you sure? This will delete ALL Items, Customers, Invoices, and HSN data permanently."
+  // The server refuses anything that does not carry this exact phrase, so the
+  // prompt is not decoration -- a mistyped answer is rejected there too.
+  const CONFIRM_PHRASE = "DELETE ALL DATA";
+
+  const handleClearData = async () => {
+    const typed = window.prompt(
+      `This permanently deletes every item, customer, invoice, voucher and ledger entry.\n\nType ${CONFIRM_PHRASE} to confirm.`
     );
 
-    if (!confirmed) return;
+    if (typed !== CONFIRM_PHRASE) {
+      if (typed !== null) alert("Phrase did not match. Nothing was deleted.");
+      return;
+    }
 
     try {
       setLoadings(true);
 
       const res = await fetch("/api/clear-all-data", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: CONFIRM_PHRASE }),
       });
 
       const data = await res.json();

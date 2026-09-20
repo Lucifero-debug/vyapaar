@@ -13,7 +13,7 @@
     "export": "next export",
     "migrate:balances": "node scripts/migrate-balances.mjs",
     "migrate:balances:apply": "node scripts/migrate-balances.mjs --apply",
-    "test": "node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs",
+    "test": "node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs && node scripts/posting-invariants.test.mjs",
     "rebuild:voucher-ledger": "node scripts/rebuild-voucher-ledger.mjs",
     "rebuild:voucher-ledger:apply": "node scripts/rebuild-voucher-ledger.mjs --apply",
     "reset:data": "node scripts/reset-data.mjs",

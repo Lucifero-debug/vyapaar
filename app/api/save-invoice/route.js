@@ -3,8 +3,8 @@ import Invoice from "@/models/invoiceModel";
 import { getNextInvoiceNo, raiseInvoiceCounter } from "@/lib/getNextInvoiceNo";
 import Customer from "../../../models/custModel";
 import Ledger from "../../../models/ledgerModel";
-import { applyDelta } from "@/lib/balance.mjs";
-import { resolveCashAccount } from "@/lib/cashAccount.mjs";
+import { balancePipeline, round2 } from "@/lib/balance.mjs";
+import { resolvePaymentAccount } from "@/lib/cashAccount.mjs";
 import {
   buildInvoiceLedgerRows,
   invoicePostingDeltas,
@@ -44,70 +44,96 @@ export async function POST(req) {
         invoiceNo = await getNextInvoiceNo(session);
       }
 
-      const [invoice] = await Invoice.create([{ ...body, invoiceNo }], { session });
+      // The money figures are DERIVED here, never taken on trust. `balanceDue`
+      // used to be whatever the client sent: the posting moved the party by
+      // finalAmount - received while `delete-invoice` reversed by balanceDue,
+      // so any client whose arithmetic disagreed (the AI upload path passes the
+      // extractor's numbers straight through) left a permanent drift behind.
+      const finalAmount = round2(
+        body.finalAmount ?? Number(body.balanceDue || 0) + Number(body.received || 0)
+      );
+      const received = round2(body.received);
+      const balanceDue = round2(finalAmount - received);
 
-      let cashAccount = null;
-      let cashAccountName;
+      const [invoice] = await Invoice.create(
+        [{ ...body, invoiceNo, finalAmount, received, balanceDue }],
+        { session }
+      );
 
       // CUSTOMER & LEDGER LOGIC
       // Uploads used to skip this entirely, so an AI-imported purchase bill
       // created an invoice and stock rows but never reached payables. An
       // invoice nobody can attribute is refused outright rather than quietly
       // kept outside the books.
-      {
-        const customer = await Customer.findOne(
-          { name: body.customer.name },
-          null,
-          { session }
-        );
+      const customer = await Customer.findOne(
+        { name: body.customer.name },
+        { _id: 1, name: 1 },
+        { session }
+      ).lean();
 
-        if (!customer) {
-          // Rolls the invoice back instead of stranding it.
-          throw new AbortTransaction({
-            success: false,
-            error: "Customer not found",
-          });
-        }
-
-        // Posting the net `balanceDue` is what made a fully-paid sale vanish:
-        // the delta came out as zero and the money received was never booked.
-        const deltas = invoicePostingDeltas({
-          type: body.type,
-          isReturn: Boolean(body.return),
-          finalAmount:
-            body.finalAmount ??
-            Number(body.balanceDue || 0) + Number(body.received || 0),
-          received: body.received,
+      if (!customer) {
+        // Rolls the invoice back instead of stranding it.
+        throw new AbortTransaction({
+          success: false,
+          error: "Customer not found",
         });
-
-        // `lastBal` is signed (+Dr / -Cr); never read it as a magnitude.
-        applyDelta(customer, deltas.partyDelta);
-        await customer.save({ session });
-
-        cashAccount = null;
-        if (deltas.settled !== 0) {
-          cashAccount = await resolveCashAccount(session);
-          cashAccountName = cashAccount.name;
-          applyDelta(cashAccount, deltas.cashDelta);
-          await cashAccount.save({ session });
-        }
-
-        await Ledger.create(
-          buildInvoiceLedgerRows({
-            type: body.type,
-            customerName: body.customer.name,
-            cashAccountName: cashAccount?.name,
-            invoiceNo,
-            date: invoice.date || new Date(),
-            paymentType: body.paymentType,
-            voucherId: invoice._id,
-            deltas,
-            partyBalance: customer.lastBal,
-            cashBalance: cashAccount?.lastBal ?? 0,
-          }),
-          { session }
-        );
       }
+
+      // Posting the net `balanceDue` is what made a fully-paid sale vanish:
+      // the delta came out as zero and the money received was never booked.
+      const deltas = invoicePostingDeltas({
+        type: body.type,
+        isReturn: Boolean(body.return),
+        finalAmount,
+        received,
+      });
+
+      // Where the money actually went. The form's payment type used to be
+      // ignored, so cheques landed in the till.
+      let payAccountName;
+      if (deltas.settled !== 0) {
+        const payAccount = await resolvePaymentAccount(body.paymentType, session);
+        payAccountName = payAccount.name;
+      }
+
+      // Accumulate by ACCOUNT NAME before writing. A cash sale billed to the
+      // cash account itself names the same document twice; loading it twice
+      // and saving both copies meant the second write discarded the first.
+      const moves = new Map();
+      const move = (name, delta) => {
+        if (!name || !delta) return;
+        moves.set(name, round2((moves.get(name) || 0) + delta));
+      };
+      move(customer.name, deltas.partyDelta);
+      move(payAccountName, deltas.cashDelta);
+
+      const balances = new Map();
+      for (const [name, delta] of moves) {
+        // Pipeline update: the increment and the Dr/Cr refresh land in one
+        // round trip and cannot interleave with a concurrent write.
+        const updated = await Customer.findOneAndUpdate(
+          { name },
+          balancePipeline(delta),
+          { new: true, session }
+        );
+        if (updated) balances.set(name, updated.lastBal);
+      }
+
+      await Ledger.create(
+        buildInvoiceLedgerRows({
+          type: body.type,
+          customerName: customer.name,
+          cashAccountName: payAccountName,
+          invoiceNo,
+          date: invoice.date || new Date(),
+          paymentType: body.paymentType,
+          voucherId: invoice._id,
+          deltas,
+          partyBalance: balances.get(customer.name) ?? 0,
+          cashBalance: balances.get(payAccountName) ?? 0,
+        }),
+        { session }
+      );
 
       // ITEM LEDGER LOGIC (always runs)
       await writeItemLedgerRows({
@@ -122,7 +148,7 @@ export async function POST(req) {
 
       // The stored running figures only stay true if the whole account or item
       // is rewritten in order -- a back-dated entry changes everything after it.
-      await recomputeLedgerBalances([body.customer?.name, cashAccountName], session);
+      await recomputeLedgerBalances([customer.name, payAccountName], session);
       await recomputeItemBalances((body.items || []).map((i) => i?.name), session);
 
       return invoice;

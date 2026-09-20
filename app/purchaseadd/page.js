@@ -456,9 +456,6 @@ const saveItem = (e) => {
 
     // Save invoice function
     const submitInvoice = async () => {
-        const encodedItems     = encodeURIComponent(JSON.stringify(selectedItem));
-        const encodedParty     = encodeURIComponent(JSON.stringify(partyTaxes));
-        const encodedHsnTotals = encodeURIComponent(JSON.stringify(hsnTotals));
         const phone            = selectedCustomer.phone;
         const hsnTotalsArray   = Object.entries(hsnTotals).map(([hsn, data]) => ({
             hsn,
@@ -528,38 +525,12 @@ const saveItem = (e) => {
                     invoiceNo;
                 if (savedNo !== invoiceNo) setInvoiceNo(savedNo);
 
-                const query = new URLSearchParams({
-                    invoiceNo: savedNo,
-                    date,
-                    customer: selectedCustomer.name,
-                    phone,
-                    totalAmount,
-                    finalAmount,
-                    received:     received || 0,
-                    balanceDue,
-                    paymentType,
-                    stateOfSupply,
-                    taxType,
-                    gst,
-                    items:        encodedItems,
-                    partyTaxes:   encodedParty,
-                    shippedTo,
-                    dispatchFrom,
-                    transport,
-                    grNo,
-                    grDate,
-                    pvtMark,
-                    caseDetails,
-                    freight,
-                    weight,
-                    ewayBillNo,
-                    ewayBillDate,
-                    orderNo,
-                    orderDate,
-                    hsnTotals:    encodedHsnTotals
-                }).toString();
-
-                router.push(`/invoice?${query}`);
+                // Only the number travels. The print page reads the saved
+                // invoice back by it, so what gets printed is what was stored.
+                // Packing the whole document into the query string put a
+                // twenty-line bill past the request-header limit, and printing
+                // or reloading it failed.
+                router.push(`/invoice?invoiceNo=${savedNo}`);
             } else {
                 alert('Failed to save invoice: ' + result.error);
             }

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import Invoice from "../../../models/invoiceModel";
 import Customer from "../../../models/custModel";
 import Ledger from "../../../models/ledgerModel";
-import { applyDelta, toDisplay } from "@/lib/balance.mjs";
-import { resolveCashAccount } from "@/lib/cashAccount.mjs";
+import { balancePipeline, round2, toDisplay } from "@/lib/balance.mjs";
+import { findPaymentAccount, resolvePaymentAccount } from "@/lib/cashAccount.mjs";
 import {
   buildInvoiceLedgerRows,
   invoicePostingDeltas,
@@ -38,7 +38,8 @@ export async function POST(req) {
     // Edit and every posting it implies commit together: a failure between them
     // used to leave the party's balance reflecting an invoice that no longer
     // existed in that form.
-    const { updatedInvoice, customer } = await withTransaction(async (session) => {
+    const { updatedInvoice, partyName, partyBalance } = await withTransaction(
+      async (session) => {
       // Snapshot the invoice as it stands so its old effect can be reversed
       // before the new one is applied.
       const previousInvoice = await Invoice.findOne({ invoiceNo: lookupNo })
@@ -62,6 +63,26 @@ export async function POST(req) {
         }
       }
 
+      const nextCustomerName = invoiceData.customer?.name;
+      const customer = await Customer.findOne(
+        { name: nextCustomerName },
+        { _id: 1, name: 1 },
+        { session }
+      ).lean();
+
+      if (!customer) {
+        throw new AbortTransaction({ success: false, error: "Customer not found" });
+      }
+
+      // Derived, never trusted — same rule as `save-invoice`, so that what a
+      // delete later reverses is exactly what an edit applied.
+      const finalAmount = round2(
+        invoiceData.finalAmount ??
+          Number(invoiceData.balanceDue || 0) + Number(invoiceData.received || 0)
+      );
+      const received = round2(invoiceData.received);
+      const balanceDue = round2(finalAmount - received);
+
       const updatedInvoice = await Invoice.findOneAndUpdate(
         { invoiceNo: lookupNo },
         {
@@ -71,6 +92,7 @@ export async function POST(req) {
             name: invoiceData.customer.name,
             phone: invoiceData.customer.phone,
             email: invoiceData.customer.email,
+            custId: invoiceData.customer.custId,
           },
           paymentType: invoiceData.paymentType,
           stateOfSupply: invoiceData.stateOfSupply,
@@ -79,9 +101,9 @@ export async function POST(req) {
           totalAmount: invoiceData.totalAmount,
           // finalAmount used to be left out entirely, so an edited invoice kept
           // its original grand total while every other figure moved.
-          finalAmount: Number(invoiceData.finalAmount) || 0,
-          received: Number(invoiceData.received) || 0,
-          balanceDue: invoiceData.balanceDue,
+          finalAmount,
+          received,
+          balanceDue,
           items: invoiceData.items,
           partyTaxes: invoiceData.partyTaxes || [],
           hsnTotals: invoiceData.hsnTotals || [],
@@ -94,6 +116,8 @@ export async function POST(req) {
           pvtMark: invoiceData.pvtMark || "",
           caseDetails: invoiceData.caseDetails || "",
           freight: invoiceData.freight || "",
+          shippedTo: invoiceData.shippedTo || "",
+          dispatchFrom: invoiceData.dispatchFrom || "",
           ewayBillNo: invoiceData.ewayBillNo || "",
           ewayBillDate: invoiceData.ewayBillDate
             ? new Date(invoiceData.ewayBillDate)
@@ -108,7 +132,7 @@ export async function POST(req) {
         throw new AbortTransaction({ success: false, error: "Invoice not found" });
       }
 
-      // ---- reverse the old posting ----------------------------------------
+      // ---- what the invoice used to post, and what it posts now -----------
       const before = invoicePostingDeltas({
         type: previousInvoice.type,
         isReturn: previousInvoice.return,
@@ -119,59 +143,55 @@ export async function POST(req) {
         received: previousInvoice.received,
       });
 
+      const after = invoicePostingDeltas({
+        type: invoiceData.type,
+        isReturn: Boolean(invoiceData.return),
+        finalAmount,
+        received,
+      });
+
       // The reversal belongs to whoever the invoice was billed to BEFORE the
       // edit. Applying it to the new name instead meant that moving an invoice
       // from A to B left A never reversed, and B carrying both A's reversal and
       // its own posting.
       const previousName = previousInvoice.customer?.name;
-      if (previousName) {
-        const previousCustomer = await Customer.findOne(
-          { name: previousName },
-          null,
-          { session }
+
+      // The money may have moved through a different account before the edit
+      // (cash yesterday, cheque today), so the old leg is reversed against the
+      // account it actually used and the new one applied where it goes now.
+      let previousPayName;
+      if (before.cashDelta !== 0) {
+        const account = await findPaymentAccount(previousInvoice.paymentType, session);
+        previousPayName = account?.name;
+      }
+
+      let nextPayName;
+      if (after.cashDelta !== 0) {
+        const account = await resolvePaymentAccount(invoiceData.paymentType, session);
+        nextPayName = account.name;
+      }
+
+      // One net movement per account. Reversing and re-applying as separate
+      // document loads clobbered any account that appeared on both sides --
+      // which is every unchanged edit.
+      const moves = new Map();
+      const move = (name, delta) => {
+        if (!name || !delta) return;
+        moves.set(name, round2((moves.get(name) || 0) + delta));
+      };
+      move(previousName, -before.partyDelta);
+      move(previousPayName, -before.cashDelta);
+      move(customer.name, after.partyDelta);
+      move(nextPayName, after.cashDelta);
+
+      const balances = new Map();
+      for (const [name, delta] of moves) {
+        const updated = await Customer.findOneAndUpdate(
+          { name },
+          balancePipeline(delta),
+          { new: true, session }
         );
-        if (previousCustomer) {
-          applyDelta(previousCustomer, -before.partyDelta);
-          await previousCustomer.save({ session });
-        }
-      }
-
-      // ---- apply the new one ----------------------------------------------
-      const customer = await Customer.findOne(
-        { name: invoiceData.customer.name },
-        null,
-        { session }
-      );
-
-      if (!customer) {
-        throw new AbortTransaction({ success: false, error: "Customer not found" });
-      }
-
-      const after = invoicePostingDeltas({
-        type: invoiceData.type,
-        isReturn: Boolean(invoiceData.return),
-        finalAmount:
-          invoiceData.finalAmount ??
-          Number(invoiceData.balanceDue || 0) + Number(invoiceData.received || 0),
-        received: invoiceData.received,
-      });
-
-      // Re-read, in case the party is unchanged and the reversal above already
-      // moved this very document.
-      const target =
-        previousName === invoiceData.customer.name
-          ? await Customer.findOne({ name: invoiceData.customer.name }, null, { session })
-          : customer;
-
-      applyDelta(target, after.partyDelta);
-      await target.save({ session });
-
-      // ---- cash ------------------------------------------------------------
-      let cashAccount = null;
-      if (before.cashDelta !== 0 || after.cashDelta !== 0) {
-        cashAccount = await resolveCashAccount(session);
-        applyDelta(cashAccount, -before.cashDelta + after.cashDelta);
-        await cashAccount.save({ session });
+        if (updated) balances.set(name, updated.lastBal);
       }
 
       // ---- rewrite the rows -------------------------------------------------
@@ -181,15 +201,15 @@ export async function POST(req) {
       await Ledger.create(
         buildInvoiceLedgerRows({
           type: invoiceData.type,
-          customerName: invoiceData.customer.name,
-          cashAccountName: cashAccount?.name,
+          customerName: customer.name,
+          cashAccountName: nextPayName,
           invoiceNo: updatedInvoice.invoiceNo,
           date: updatedInvoice.date || new Date(),
           paymentType: invoiceData.paymentType,
           voucherId: updatedInvoice._id,
           deltas: after,
-          partyBalance: target.lastBal,
-          cashBalance: cashAccount?.lastBal ?? 0,
+          partyBalance: balances.get(customer.name) ?? 0,
+          cashBalance: balances.get(nextPayName) ?? 0,
         }),
         { session }
       );
@@ -205,7 +225,7 @@ export async function POST(req) {
           type: invoiceData.type,
           isReturn: Boolean(invoiceData.return),
           items: [],
-          partyName: invoiceData.customer.name,
+          partyName: customer.name,
         });
       }
 
@@ -216,13 +236,10 @@ export async function POST(req) {
         type: invoiceData.type,
         isReturn: Boolean(invoiceData.return),
         items: invoiceData.items,
-        partyName: invoiceData.customer.name,
+        partyName: customer.name,
       });
 
-      await recomputeLedgerBalances(
-        [previousName, invoiceData.customer.name, cashAccount?.name],
-        session
-      );
+      await recomputeLedgerBalances([...moves.keys()], session);
       await recomputeItemBalances(
         [
           ...(previousInvoice.items || []).map((i) => i?.name),
@@ -231,7 +248,11 @@ export async function POST(req) {
         session
       );
 
-      return { updatedInvoice, customer: target };
+      return {
+        updatedInvoice,
+        partyName: customer.name,
+        partyBalance: balances.get(customer.name) ?? 0,
+      };
     });
 
     return NextResponse.json({
@@ -239,10 +260,10 @@ export async function POST(req) {
       success: true,
       updatedInvoice,
       customerBalance: {
-        name: customer.name,
-        balance: toDisplay(customer.lastBal).amount,
-        signedBalance: customer.lastBal,
-        mode: customer.lastMode,
+        name: partyName,
+        balance: toDisplay(partyBalance).amount,
+        signedBalance: partyBalance,
+        mode: toDisplay(partyBalance).mode,
       },
     });
   } catch (error) {

@@ -83,28 +83,13 @@ const handleUpload = async () => {
     const result = await saveRes.json();
 
     if (result.success) {
-      // 6. Navigate to Invoice view page with URL params (Matches your query logic)
-      const encodedItems = encodeURIComponent(JSON.stringify(invoiceData.items));
-      const encodedParty = encodeURIComponent(JSON.stringify(invoiceData.partyTaxes));
-      const encodedHsnTotals = encodeURIComponent(JSON.stringify(aiInvoice.hsnTotals));
-
-      const query = new URLSearchParams({
-        invoiceNo: invoiceData.invoiceNo,
-        date: invoiceData.date,
-        customer: invoiceData.customer.name,
-        phone: invoiceData.customer.phone,
-        totalAmount: invoiceData.totalAmount,
-        finalAmount: invoiceData.finalAmount,
-        received: invoiceData.received,
-        balanceDue: invoiceData.balanceDue,
-        items: encodedItems,
-        partyTaxes: encodedParty,
-        hsnTotals: encodedHsnTotals,
-        type: "Purchase"
-      }).toString();
+      // 6. Show the invoice the server actually stored. The number the server
+      //    settled on can differ from the one the extractor read, if that one
+      //    was already taken.
+      const savedNo = result.invoice?.invoiceNo ?? invoiceData.invoiceNo;
 
       alert("Invoice processed and saved successfully! 🚀");
-      router.push(`/invoice?${query}`);
+      router.push(`/invoice?invoiceNo=${savedNo}`);
     } else {
       alert('Failed to save invoice: ' + result.error);
     }

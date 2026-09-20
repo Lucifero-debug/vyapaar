@@ -1,11 +1,10 @@
-import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import Invoice from "../../../models/invoiceModel";
 import Customer from "../../../models/custModel";
 import Ledger from "../../../models/ledgerModel";
 import ItemLedger from "../../../models/itemLedgerModel";
-import { applyDelta, invoiceDelta, round2, toDisplay, voucherDelta } from "@/lib/balance.mjs";
-import { findCashAccount } from "@/lib/cashAccount.mjs";
+import { balancePipeline, round2, toDisplay, voucherDelta } from "@/lib/balance.mjs";
+import { invoicePostingDeltas } from "@/lib/invoicePosting.mjs";
 import {
   recomputeItemBalances,
   recomputeLedgerBalances,
@@ -24,108 +23,118 @@ export async function POST(req) {
     // Invoice, its ledger rows, its stock rows and the balance reversal all
     // commit together — a partial delete used to leave dangling ledger entries
     // or a balance reversed against an invoice that still existed.
-    const { deletedInvoice, deleteResult, customer } = await withTransaction(
-      async (session) => {
-    // === Delete the Invoice ===
-    const deletedInvoice = await Invoice.findOneAndDelete(
-      { invoiceNo: Number(invoiceNo) },
-      { session }
-    );
-
-    if (!deletedInvoice) {
-      throw new AbortTransaction({ error: "Invoice not found." }, 404);
-    }
-
-    // === Build Safe Ledger Delete Query ===
-    // Anchored at the end. Unanchored, deleting invoice 12 also matched
-    // "By Invoice No: 120", "121" and "1200" and deleted their rows too.
-    const escaped = String(invoiceNo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const query = [
-      {
-        narration: {
-          $regex: `Invoice No:?\\s*${escaped}\\s*$`,
-          $options: "i",
-        },
-      },
-    ];
-
-    // Add voucherId filter only if it’s a valid ObjectId
-    if (mongoose.Types.ObjectId.isValid(deletedInvoice._id)) {
-      query.push({ voucherId: deletedInvoice._id });
-    }
-
-    // Reverse the cash leg by what was actually written, not by recomputing
-    // it: invoices raised before the receipt leg existed have no cash rows, and
-    // recomputing would move cash that was never posted in the first place.
-    const cashAccount = await findCashAccount(session);
-    const cashRows = cashAccount
-      ? await Ledger.find(
-          { voucherId: deletedInvoice._id, customerName: cashAccount.name },
-          null,
+    const { deletedInvoice, deletedLedgerCount, partyName, partyBalance } =
+      await withTransaction(async (session) => {
+        const deletedInvoice = await Invoice.findOneAndDelete(
+          { invoiceNo: Number(invoiceNo) },
           { session }
-        ).lean()
-      : [];
-    const cashPosted = cashRows.reduce(
-      (sum, row) => round2(sum + voucherDelta({ debit: row.debit, credit: row.credit })),
-      0
-    );
+        );
 
-    const deleteResult = await Ledger.deleteMany({ $or: query }, { session });
+        if (!deletedInvoice) {
+          throw new AbortTransaction({ error: "Invoice not found." }, 404);
+        }
 
-    await ItemLedger.deleteMany({ invoiceNo: Number(invoiceNo) }, { session });
+        // === Find this invoice's ledger rows ===
+        //
+        // By `voucherId` and nothing else. Rows used to be matched on their
+        // narration too ("...Invoice No: 12"), which is free text a user also
+        // types on a receipt voucher against that same bill -- so deleting the
+        // invoice silently ate the VOUCHER's row, leaving the party's balance
+        // permanently disagreeing with its own ledger. Every row an invoice
+        // writes carries its `voucherId`; the narration match only ever added
+        // other people's rows.
+        const rows = await Ledger.find(
+          { voucherId: deletedInvoice._id },
+          { customerName: 1, debit: 1, credit: 1 },
+          { session }
+        ).lean();
 
-    // === Update Customer Balance ===
-    const customer = await Customer.findOne(
-      { name: deletedInvoice.customer?.name },
-      null,
-      { session }
-    );
+        const partyName = deletedInvoice.customer?.name;
 
-    if (customer) {
-      // Deleting an invoice reverses exactly what posting it did. The party's
-      // NET movement is still balanceDue: the document leg and the receipt leg
-      // are equal and opposite around it, so
-      // invoiceDelta(final) - invoiceDelta(received) === invoiceDelta(balanceDue).
-      applyDelta(
-        customer,
-        -invoiceDelta({
+        // Reverse the settlement legs by what was ACTUALLY posted, against
+        // whichever account they landed in. Re-deriving them instead would
+        // move money that was never posted on invoices raised before the
+        // receipt leg existed, and would guess wrong on any invoice whose
+        // payment type has since been edited.
+        const settlement = new Map();
+        for (const row of rows) {
+          if (!row.customerName || row.customerName === partyName) continue;
+          settlement.set(
+            row.customerName,
+            round2(
+              (settlement.get(row.customerName) || 0) +
+                voucherDelta({ debit: row.debit, credit: row.credit })
+            )
+          );
+        }
+
+        const deleteResult = await Ledger.deleteMany(
+          { voucherId: deletedInvoice._id },
+          { session }
+        );
+
+        await ItemLedger.deleteMany({ invoiceNo: Number(invoiceNo) }, { session });
+
+        // === Reverse the balances ===
+        //
+        // Deleting an invoice undoes exactly what posting it did, derived from
+        // the same function `save-invoice` and `sale-alter` apply. This used to
+        // reverse by the stored `balanceDue` while the posting moved the party
+        // by finalAmount - received: identical whenever the client's arithmetic
+        // agreed, and a permanent drift whenever it did not.
+        const deltas = invoicePostingDeltas({
           type: deletedInvoice.type,
           isReturn: deletedInvoice.return,
-          amount: deletedInvoice.balanceDue || 0,
-        })
-      );
-      await customer.save({ session });
-    }
+          finalAmount:
+            deletedInvoice.finalAmount ??
+            Number(deletedInvoice.balanceDue || 0) +
+              Number(deletedInvoice.received || 0),
+          received: deletedInvoice.received,
+        });
 
-    if (cashAccount && cashPosted !== 0) {
-      applyDelta(cashAccount, -cashPosted);
-      await cashAccount.save({ session });
-    }
+        const moves = new Map();
+        const move = (name, delta) => {
+          if (!name || !delta) return;
+          moves.set(name, round2((moves.get(name) || 0) + delta));
+        };
+        move(partyName, -deltas.partyDelta);
+        for (const [name, posted] of settlement) move(name, -posted);
 
-        await recomputeLedgerBalances(
-          [deletedInvoice.customer?.name, cashAccount?.name],
-          session
-        );
+        let partyBalance = 0;
+        for (const [name, delta] of moves) {
+          const updated = await Customer.findOneAndUpdate(
+            { name },
+            balancePipeline(delta),
+            { new: true, session }
+          );
+          if (updated && name === partyName) partyBalance = updated.lastBal;
+        }
+
+        await recomputeLedgerBalances([...moves.keys()], session);
         await recomputeItemBalances(
           (deletedInvoice.items || []).map((i) => i?.name),
           session
         );
 
-        return { deletedInvoice, deleteResult, customer };
-      }
-    );
+        return {
+          deletedInvoice,
+          deletedLedgerCount: deleteResult.deletedCount,
+          partyName,
+          partyBalance,
+        };
+      });
 
     return NextResponse.json({
       message: "Invoice and related ledger entries deleted successfully",
       success: true,
-      deletedLedgerCount: deleteResult.deletedCount,
+      deletedLedgerCount,
       deletedInvoice,
-      updatedCustomer: customer
+      updatedCustomer: partyName
         ? {
-            name: customer.name,
-            balance: toDisplay(customer.lastBal).amount,
-            signedBalance: customer.lastBal,
-            mode: customer.lastMode,
+            name: partyName,
+            balance: toDisplay(partyBalance).amount,
+            signedBalance: partyBalance,
+            mode: toDisplay(partyBalance).mode,
           }
         : null,
     });

@@ -55,6 +55,12 @@ customer: {
       name: { type: String },
     },
 
+    // Where the goods went / came from, as typed on the form. These used to
+    // exist only in the URL that carried the user to the print page, so they
+    // were gone the moment that page was reloaded or the invoice reopened.
+    shippedTo: { type: String },
+    dispatchFrom: { type: String },
+
     items: [itemSchema],
 
     partyTaxes: [partyTaxSchema],

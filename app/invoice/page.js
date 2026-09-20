@@ -1,5 +1,6 @@
 'use client'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
+import { splitGst } from '@/lib/gst.mjs';
 import AddIcCallOutlinedIcon from '@mui/icons-material/AddIcCallOutlined';
 import { useSearchParams } from 'next/navigation';
 import html2canvas from 'html2canvas';
@@ -100,39 +101,116 @@ const downloadPDF = async () => {
     }
   };
   
+  /**
+   * The invoice is READ BACK from the database, by number.
+   *
+   * Every field used to be packed into the URL -- each line item with the whole
+   * item master spread into it, double-encoded. A twenty-line bill came to
+   * ~18,000 characters, past both Node's 16KB request-header limit and
+   * Vercel's, so printing or reloading such an invoice failed outright. It also
+   * meant the printed document was whatever the URL said rather than what was
+   * actually saved.
+   */
   const invoiceNo = searchParams.get('invoiceNo');
-  const date = searchParams.get('date');
-  const customer = searchParams.get('customer');
-  const phone = searchParams.get('phone');
-  const taxType = searchParams.get('taxType');
-  const finalAmount = parseFloat(searchParams.get('finalAmount'));
-  const gstAmount = parseFloat(searchParams.get('gstAmount'));
-  const gst = parseInt(searchParams.get('gst'));
-  const received = parseFloat(searchParams.get('received'));
-  const balanceDue = parseFloat(searchParams.get('balanceDue'));
-  const stateOfSupply = searchParams.get('stateOfSupply');
-  const items = JSON.parse(decodeURIComponent(searchParams.get('items')));
-  const partyTaxes = JSON.parse(decodeURIComponent(searchParams.get('partyTaxes')));
-  const shippedTo = searchParams.get("shippedTo");
-const dispatchFrom = searchParams.get("dispatchFrom");
-const transport = searchParams.get("transport");
-const grNo = searchParams.get("grNo");
-const grDate = searchParams.get("grDate");
-const pvtMark = searchParams.get("pvtMark");
-const caseDetails = searchParams.get("caseDetails");
-const freight = searchParams.get("freight");
-const weight = searchParams.get("weight");
-const ewayBillNo = searchParams.get("ewayBillNo");
-const ewayBillDate = searchParams.get("ewayBillDate");
-const orderNo=searchParams.get("orderNo")
-const orderDate=searchParams.get("orderDate")
-const hsnTotals=searchParams.get("hsnTotals") ? JSON.parse(decodeURIComponent(searchParams.get("hsnTotals"))) : {};
+  const [invoice, setInvoice] = useState(null);
+  const [loadState, setLoadState] = useState('loading');
 
-// Compute total taxable amount and GST totals
-const totalTaxableAmount = items.reduce((sum, item) => sum + (item.taxableAmount || (item.cost * item.quantity)), 0);
-const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount || (item.cost * item.quantity)) * (item.gstRate || 0) / 100), 0);
+  useEffect(() => {
+    if (!invoiceNo) {
+      setLoadState('missing');
+      return;
+    }
 
+    let cancelled = false;
+    setLoadState('loading');
 
+    (async () => {
+      try {
+        const res = await fetch('/api/invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: invoiceNo }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data?.success && data.final) {
+          setInvoice(data.final);
+          setLoadState('ready');
+        } else {
+          setLoadState('missing');
+        }
+      } catch {
+        if (!cancelled) setLoadState('error');
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [invoiceNo]);
+
+  const items = invoice?.items || [];
+  const partyTaxes = invoice?.partyTaxes || [];
+
+  // Stored as an array of { hsn, amount, total }; the table below reads a map.
+  const hsnTotals = (invoice?.hsnTotals || []).reduce((acc, row) => {
+    acc[row.hsn] = { gstRate: row.gstRate, gstAmount: row.amount, total: row.total };
+    return acc;
+  }, {});
+
+  const date = invoice?.date ? new Date(invoice.date).toISOString().substring(0, 10) : '';
+  const customer = invoice?.customer?.name || '';
+  const phone = invoice?.customer?.phone || '';
+  const taxType = invoice?.taxType || 'local';
+  const finalAmount = Number(invoice?.finalAmount) || 0;
+  const received = Number(invoice?.received) || 0;
+  const balanceDue = Number(invoice?.balanceDue) || 0;
+  const stateOfSupply = invoice?.stateOfSupply || '';
+  const shippedTo = invoice?.shippedTo || '';
+  const dispatchFrom = invoice?.dispatchFrom || '';
+  const transport = invoice?.transport || '';
+  const grNo = invoice?.grNo || '';
+  const grDate = invoice?.grDate ? new Date(invoice.grDate).toLocaleDateString('en-IN') : '';
+  const pvtMark = invoice?.pvtMark || '';
+  const caseDetails = invoice?.caseDetails || '';
+  const freight = invoice?.freight || '';
+  const weight = invoice?.weight || '';
+  const ewayBillNo = invoice?.ewayBillNo || '';
+  const ewayBillDate = invoice?.ewayBillDate ? new Date(invoice.ewayBillDate).toLocaleDateString('en-IN') : '';
+  const orderNo = invoice?.orderNo || '';
+  const orderDate = invoice?.orderDate ? new Date(invoice.orderDate).toLocaleDateString('en-IN') : '';
+
+// Compute total taxable amount and GST totals.
+//
+// `??` rather than `||`: a free line or one discounted to nothing has a
+// taxableAmount of 0, which is falsy, so it used to fall back to cost x
+// quantity and print at full value with full GST on it.
+const lineTaxable = (item) =>
+  Number(item.taxableAmount ?? (Number(item.cost) || 0) * (Number(item.quantity) || 0)) || 0;
+
+const totalTaxableAmount = items.reduce((sum, item) => sum + lineTaxable(item), 0);
+const totalGstAmount = items.reduce(
+  (sum, item) => sum + (lineTaxable(item) * (Number(item.gstRate) || 0)) / 100,
+  0
+);
+
+// SGST and CGST have to add up to the tax actually charged. Halving and
+// rounding each side independently disagreed with the total on half of all
+// amounts, by a paisa.
+const { sgst, cgst } = splitGst(totalGstAmount);
+
+  if (loadState === 'loading') {
+    return <div className="page-shell text-sm text-muted-foreground">Loading invoice {invoiceNo}...</div>;
+  }
+
+  if (loadState !== 'ready') {
+    return (
+      <div className="page-shell text-sm text-destructive">
+        {loadState === 'missing'
+          ? `Invoice ${invoiceNo || ''} could not be found.`
+          : 'Could not load this invoice. Please try again.'}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -187,11 +265,11 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
             <p className="mt-1">Tax Type: {taxType}</p>
             {taxType === 'local' ? (
               <>
-                <p>SGST: {(totalGstAmount/2).toFixed(2)}</p>
-                <p>CGST: {(totalGstAmount/2).toFixed(2)}</p>
+                <p>SGST: {sgst.toFixed(2)}</p>
+                <p>CGST: {cgst.toFixed(2)}</p>
               </>
             ) : (
-              <p>IGST: {totalGstAmount}</p>
+              <p>IGST: {totalGstAmount.toFixed(2)}</p>
             )}
                {dispatchFrom && (
       <>
@@ -275,11 +353,11 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
         <tr className="border-b border-gray-200 hover:bg-gray-50">
           <td className="py-3 px-4 text-gray-800">{item.name}</td>
           <td className="py-3 px-4 text-center">{item.quantity}</td>
-          <td className="py-3 px-4 text-right">₹{item.cost.toFixed(2)}</td>
-          <td className="py-3 px-4 text-right">{item.discount.toFixed(2)}%</td>
+          <td className="py-3 px-4 text-right">₹{(Number(item.cost) || 0).toFixed(2)}</td>
+          <td className="py-3 px-4 text-right">{(Number(item.discount) || 0).toFixed(2)}%</td>
           <td className="py-3 px-4 text-right">{item.hsn}</td>
           <td className="py-3 px-4 text-right">{item.gstRate || 0}%</td>
-          <td className="py-3 px-4 text-right font-semibold">₹{item.total.toFixed(2)}</td>
+          <td className="py-3 px-4 text-right font-semibold">₹{(Number(item.total) || 0).toFixed(2)}</td>
         </tr>
         {item.description && (
           <tr className="border-b border-gray-200 bg-gray-50">
@@ -374,8 +452,8 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
 {taxType === 'local' ? (
   <>
     <p><strong>Taxable Amount:</strong> ₹{totalTaxableAmount.toFixed(2)}</p>
-    <p><strong>SGST:</strong> ₹{(totalGstAmount / 2).toFixed(2)}</p>
-    <p><strong>CGST:</strong> ₹{(totalGstAmount / 2).toFixed(2)}</p>
+    <p><strong>SGST:</strong> ₹{sgst.toFixed(2)}</p>
+    <p><strong>CGST:</strong> ₹{cgst.toFixed(2)}</p>
   </>
 ) : (
   <>
