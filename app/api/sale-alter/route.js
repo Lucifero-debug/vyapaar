@@ -1,94 +1,254 @@
 import { NextResponse } from "next/server";
-import { connect } from '../../../lib/mongodb';
 import Invoice from "../../../models/invoiceModel";
 import Customer from "../../../models/custModel";
-import Ledger from '../../../models/ledgerModel'; // Optional: if you're maintaining ledger
+import Ledger from "../../../models/ledgerModel";
+import { applyDelta, toDisplay } from "@/lib/balance.mjs";
+import { resolveCashAccount } from "@/lib/cashAccount.mjs";
+import {
+  buildInvoiceLedgerRows,
+  invoicePostingDeltas,
+} from "@/lib/invoicePosting.mjs";
+import { writeItemLedgerRows } from "@/lib/itemLedger.mjs";
+import {
+  recomputeItemBalances,
+  recomputeLedgerBalances,
+} from "@/lib/runningBalances.mjs";
+import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
 
 export async function POST(req) {
   try {
-    await connect();
     const invoiceData = await req.json();
-    const invoiceId = invoiceData.invoiceNo;
 
-    const updatedInvoice = await Invoice.findOneAndUpdate(
-      { invoiceNo: invoiceId },
-      {
-        invoiceNo: invoiceData.invoiceNo,
-        date: invoiceData.date,
-        customer: {
-          name: invoiceData.customer.name,
-          phone: invoiceData.customer.phone,
-          email: invoiceData.customer.email,
-        },
-        paymentType: invoiceData.paymentType,
-        stateOfSupply: invoiceData.stateOfSupply,
-        taxType: invoiceData.taxType,
-        gst: invoiceData.gst,
-        totalAmount: invoiceData.totalAmount,
-        received: Number(invoiceData.received) || 0,
-        balanceDue: invoiceData.balanceDue,
-        items: invoiceData.items,
-        partyTaxes: invoiceData.partyTaxes || [],
-        weight: Number(invoiceData.weight) || 0,
-        transport: invoiceData.transport || '',
-        grNo: invoiceData.grNo || '',
-        grDate: invoiceData.grDate ? new Date(invoiceData.grDate) : null,
-        orderNo: Number(invoiceData.orderNo) || 0,
-        orderDate: invoiceData.orderDate ? new Date(invoiceData.orderDate) : null,
-        pvtMark: invoiceData.pvtMark || '',
-        caseDetails: invoiceData.caseDetails || '',
-        freight: invoiceData.freight || '',
-        ewayBillNo: invoiceData.ewayBillNo || '',
-        ewayBillDate: invoiceData.ewayBillDate ? new Date(invoiceData.ewayBillDate) : null,
-        type: invoiceData.type,
-        return: invoiceData.return || false,
-      },
-      { new: true }
+    // The invoice number is an editable field on the form, so it cannot also be
+    // the lookup key: changing #5 to #6 used to find invoice SIX and overwrite
+    // it with #5's contents, leaving #5 untouched. The page sends the number it
+    // opened with, and that is what identifies the row.
+    const lookupNo = Number(
+      invoiceData.originalInvoiceNo ?? invoiceData.invoiceNo
     );
+    const nextNo = Number(invoiceData.invoiceNo);
 
-    if (!updatedInvoice) {
-      return NextResponse.json({ success: false, error: 'Invoice not found' });
+    if (!Number.isFinite(lookupNo)) {
+      return NextResponse.json(
+        { success: false, error: "Invoice number missing." },
+        { status: 400 }
+      );
     }
 
-    // === Update Customer Balance Logic ===
-    const customer = await Customer.findOne({ name: invoiceData.customer.name });
+    // Edit and every posting it implies commit together: a failure between them
+    // used to leave the party's balance reflecting an invoice that no longer
+    // existed in that form.
+    const { updatedInvoice, customer } = await withTransaction(async (session) => {
+      // Snapshot the invoice as it stands so its old effect can be reversed
+      // before the new one is applied.
+      const previousInvoice = await Invoice.findOne({ invoiceNo: lookupNo })
+        .session(session)
+        .lean();
 
-    if (!customer) {
-      return NextResponse.json({ success: false, error: 'Customer not found' });
-    }
+      if (!previousInvoice) {
+        throw new AbortTransaction({ success: false, error: "Invoice not found" });
+      }
 
-    let prevBalance = customer.lastBal || 0;
-    let invoiceAmount = invoiceData.balanceDue || 0;
-    let updatedBalance;
+      // Renumbering onto an invoice that already exists would destroy it.
+      if (Number.isFinite(nextNo) && nextNo !== lookupNo) {
+        const clash = await Invoice.findOne({ invoiceNo: nextNo })
+          .session(session)
+          .lean();
+        if (clash) {
+          throw new AbortTransaction({
+            success: false,
+            error: `Invoice No ${nextNo} already exists.`,
+          });
+        }
+      }
 
-    if (invoiceData.type === 'Sale') {
-      updatedBalance = invoiceData.return
-        ? prevBalance - invoiceAmount
-        : prevBalance + invoiceAmount;
-      customer.lastMode = updatedBalance >= 0 ? 'Dr' : 'Cr';
-    } else if (invoiceData.type === 'Purchase') {
-      updatedBalance = invoiceData.return
-        ? prevBalance + invoiceAmount
-        : prevBalance - invoiceAmount;
-      customer.lastMode = updatedBalance >= 0 ? 'Cr' : 'Dr';
-    }
+      const updatedInvoice = await Invoice.findOneAndUpdate(
+        { invoiceNo: lookupNo },
+        {
+          invoiceNo: Number.isFinite(nextNo) ? nextNo : lookupNo,
+          date: invoiceData.date,
+          customer: {
+            name: invoiceData.customer.name,
+            phone: invoiceData.customer.phone,
+            email: invoiceData.customer.email,
+          },
+          paymentType: invoiceData.paymentType,
+          stateOfSupply: invoiceData.stateOfSupply,
+          taxType: invoiceData.taxType,
+          gst: invoiceData.gst,
+          totalAmount: invoiceData.totalAmount,
+          // finalAmount used to be left out entirely, so an edited invoice kept
+          // its original grand total while every other figure moved.
+          finalAmount: Number(invoiceData.finalAmount) || 0,
+          received: Number(invoiceData.received) || 0,
+          balanceDue: invoiceData.balanceDue,
+          items: invoiceData.items,
+          partyTaxes: invoiceData.partyTaxes || [],
+          hsnTotals: invoiceData.hsnTotals || [],
+          weight: Number(invoiceData.weight) || 0,
+          transport: invoiceData.transport || "",
+          grNo: invoiceData.grNo || "",
+          grDate: invoiceData.grDate ? new Date(invoiceData.grDate) : null,
+          orderNo: Number(invoiceData.orderNo) || 0,
+          orderDate: invoiceData.orderDate ? new Date(invoiceData.orderDate) : null,
+          pvtMark: invoiceData.pvtMark || "",
+          caseDetails: invoiceData.caseDetails || "",
+          freight: invoiceData.freight || "",
+          ewayBillNo: invoiceData.ewayBillNo || "",
+          ewayBillDate: invoiceData.ewayBillDate
+            ? new Date(invoiceData.ewayBillDate)
+            : null,
+          type: invoiceData.type,
+          return: invoiceData.return || false,
+        },
+        { new: true, session }
+      );
 
-    customer.lastBal = Math.abs(updatedBalance);
-    await customer.save();
-    console.log("jeesse",updatedInvoice)
-    
+      if (!updatedInvoice) {
+        throw new AbortTransaction({ success: false, error: "Invoice not found" });
+      }
+
+      // ---- reverse the old posting ----------------------------------------
+      const before = invoicePostingDeltas({
+        type: previousInvoice.type,
+        isReturn: previousInvoice.return,
+        finalAmount:
+          previousInvoice.finalAmount ??
+          Number(previousInvoice.balanceDue || 0) +
+            Number(previousInvoice.received || 0),
+        received: previousInvoice.received,
+      });
+
+      // The reversal belongs to whoever the invoice was billed to BEFORE the
+      // edit. Applying it to the new name instead meant that moving an invoice
+      // from A to B left A never reversed, and B carrying both A's reversal and
+      // its own posting.
+      const previousName = previousInvoice.customer?.name;
+      if (previousName) {
+        const previousCustomer = await Customer.findOne(
+          { name: previousName },
+          null,
+          { session }
+        );
+        if (previousCustomer) {
+          applyDelta(previousCustomer, -before.partyDelta);
+          await previousCustomer.save({ session });
+        }
+      }
+
+      // ---- apply the new one ----------------------------------------------
+      const customer = await Customer.findOne(
+        { name: invoiceData.customer.name },
+        null,
+        { session }
+      );
+
+      if (!customer) {
+        throw new AbortTransaction({ success: false, error: "Customer not found" });
+      }
+
+      const after = invoicePostingDeltas({
+        type: invoiceData.type,
+        isReturn: Boolean(invoiceData.return),
+        finalAmount:
+          invoiceData.finalAmount ??
+          Number(invoiceData.balanceDue || 0) + Number(invoiceData.received || 0),
+        received: invoiceData.received,
+      });
+
+      // Re-read, in case the party is unchanged and the reversal above already
+      // moved this very document.
+      const target =
+        previousName === invoiceData.customer.name
+          ? await Customer.findOne({ name: invoiceData.customer.name }, null, { session })
+          : customer;
+
+      applyDelta(target, after.partyDelta);
+      await target.save({ session });
+
+      // ---- cash ------------------------------------------------------------
+      let cashAccount = null;
+      if (before.cashDelta !== 0 || after.cashDelta !== 0) {
+        cashAccount = await resolveCashAccount(session);
+        applyDelta(cashAccount, -before.cashDelta + after.cashDelta);
+        await cashAccount.save({ session });
+      }
+
+      // ---- rewrite the rows -------------------------------------------------
+      // The ledger was never touched here at all, so an edited invoice left its
+      // original rows in place and the report drifted from the balance forever.
+      await Ledger.deleteMany({ voucherId: updatedInvoice._id }, { session });
+      await Ledger.create(
+        buildInvoiceLedgerRows({
+          type: invoiceData.type,
+          customerName: invoiceData.customer.name,
+          cashAccountName: cashAccount?.name,
+          invoiceNo: updatedInvoice.invoiceNo,
+          date: updatedInvoice.date || new Date(),
+          paymentType: invoiceData.paymentType,
+          voucherId: updatedInvoice._id,
+          deltas: after,
+          partyBalance: target.lastBal,
+          cashBalance: cashAccount?.lastBal ?? 0,
+        }),
+        { session }
+      );
+
+      // Stock was not maintained here either: changing a quantity left the old
+      // one in the stock ledger. Clear the old number's rows too, in case the
+      // invoice was renumbered.
+      if (Number.isFinite(nextNo) && nextNo !== lookupNo) {
+        await writeItemLedgerRows({
+          session,
+          invoiceNo: lookupNo,
+          date: updatedInvoice.date || new Date(),
+          type: invoiceData.type,
+          isReturn: Boolean(invoiceData.return),
+          items: [],
+          partyName: invoiceData.customer.name,
+        });
+      }
+
+      await writeItemLedgerRows({
+        session,
+        invoiceNo: updatedInvoice.invoiceNo,
+        date: updatedInvoice.date || new Date(),
+        type: invoiceData.type,
+        isReturn: Boolean(invoiceData.return),
+        items: invoiceData.items,
+        partyName: invoiceData.customer.name,
+      });
+
+      await recomputeLedgerBalances(
+        [previousName, invoiceData.customer.name, cashAccount?.name],
+        session
+      );
+      await recomputeItemBalances(
+        [
+          ...(previousInvoice.items || []).map((i) => i?.name),
+          ...(invoiceData.items || []).map((i) => i?.name),
+        ],
+        session
+      );
+
+      return { updatedInvoice, customer: target };
+    });
+
     return NextResponse.json({
       message: "Invoice updated successfully",
       success: true,
       updatedInvoice,
       customerBalance: {
         name: customer.name,
-        balance: customer.lastBal,
-        mode: customer.lastMode
-      }
+        balance: toDisplay(customer.lastBal).amount,
+        signedBalance: customer.lastBal,
+        mode: customer.lastMode,
+      },
     });
-
   } catch (error) {
+    if (error instanceof AbortTransaction) {
+      return NextResponse.json(error.payload, { status: error.status });
+    }
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

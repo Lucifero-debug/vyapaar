@@ -48,19 +48,24 @@ if (data.all) {
   }, [customerId]);
 
   // ------------------------
-  // Filter by Date
+  // Date window
   // ------------------------
-  const filterByDate = (data) => {
-    if (!fromDate && !toDate) return data;
-    return data.filter((entry) => {
-      const entryDate = new Date(entry.date);
-      const from = fromDate ? new Date(fromDate) : null;
-      const to = toDate ? new Date(toDate) : null;
-      if (from && entryDate < from) return false;
-      if (to && entryDate > to) return false;
-      return true;
-    });
+  // A row is either before the window, inside it, or after it. Anything before
+  // it has to be folded into the opening balance rather than dropped: showing a
+  // period while starting from the account's original opening balance is what
+  // made every filtered ledger disagree with the unfiltered one.
+  const from = fromDate ? new Date(fromDate) : null;
+  const to = toDate ? new Date(toDate) : null;
+  if (to) to.setHours(23, 59, 59, 999);
+
+  const placeInWindow = (entry) => {
+    const on = new Date(entry.date);
+    if (from && on < from) return "before";
+    if (to && on > to) return "after";
+    return "inside";
   };
+
+  const movement = (entry) => (entry.debit || 0) - (entry.credit || 0);
 
   if (!customerId)
     return (
@@ -68,25 +73,28 @@ if (data.all) {
         <Suspense fallback={null}>
           <LedgerSearchParams onValue={setCustomerId} />
         </Suspense>
-        <div className="p-6 text-red-500 text-center">No customer selected.</div>
+        <div className="page-shell">
+          <div className="empty-state">No customer selected.</div>
+        </div>
       </>
     );
 
-  if (loading) return <div className="p-6 text-center">Loading ledger...</div>;
-  if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
+  if (loading) return <div className="page-shell text-center text-sm text-muted-foreground">Loading ledger...</div>;
+  if (error) return <div className="page-shell text-center text-sm text-destructive">Error: {error}</div>;
 
   // ------------------------
   // 🧾 Process Ledgers
   // ------------------------
-  const filteredEntries = filterByDate(ledgers).sort(
-    (a, b) => new Date(a.date) - new Date(b.date)
-  );
+  // Group EVERY row, not just the ones in the window — the rows before it are
+  // what the opening balance is built from.
+  const sorted = [...ledgers].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  // Group by customer name
-  const groupedByCustomer = filteredEntries.reduce((acc, entry) => {
+  const groupedByCustomer = sorted.reduce((acc, entry) => {
     const cust = entry.customerName || "Unknown";
-    if (!acc[cust]) acc[cust] = [];
-    acc[cust].push(entry);
+    if (!acc[cust]) acc[cust] = { before: [], inside: [] };
+    const place = placeInWindow(entry);
+    if (place === "before") acc[cust].before.push(entry);
+    else if (place === "inside") acc[cust].inside.push(entry);
     return acc;
   }, {});
 
@@ -99,66 +107,83 @@ if (data.all) {
         <LedgerSearchParams onValue={setCustomerId} />
       </Suspense>
 
-      <div className="max-w-6xl mx-auto my-10 bg-gray-50 p-6 rounded-2xl shadow-lg border border-gray-200 font-mono">
+      <div className="page-shell">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold uppercase text-gray-800">DURGA HARDWARE</h2>
-          <p className="text-sm text-gray-600">
+        <div className="doc-head">
+          <h2 className="doc-org">DURGA HARDWARE</h2>
+          <p className="doc-meta">
             LIG FLATS NO.68, IIIIRD FLOOR, SARITA VIHAR, NEW DELHI-110076
           </p>
-          <p className="mt-2 font-semibold text-gray-700 text-lg">
+          <p className="doc-kind">
             LEDGER {customerId === "0" ? "(ALL ACCOUNTS)" : `- ${customer?.name || "Customer"}`}
           </p>
         </div>
 
         {/* Date Filter Section */}
-        <div className="flex flex-wrap gap-4 justify-center mb-8">
-          <div className="flex items-center gap-2">
-            <label className="text-gray-700 font-medium">From:</label>
+        <div className="no-print mb-6 flex flex-wrap items-end justify-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="field">
+            <label className="field-label">From:</label>
             <input
               type="date"
-              className="border border-gray-300 rounded-md px-2 py-1"
+              className="field-input w-44"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-gray-700 font-medium">To:</label>
+          <div className="field">
+            <label className="field-label">To:</label>
             <input
               type="date"
-              className="border border-gray-300 rounded-md px-2 py-1"
+              className="field-input w-44"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="btn btn-secondary"
+          >
+            Print
+          </button>
         </div>
 
         {/* Ledgers */}
 {Object.entries(groupedByCustomer).length > 0 ? (
-  Object.entries(groupedByCustomer).map(([custName, entries,openingBal], idx) => {
+  Object.entries(groupedByCustomer).map(([custName, { before, inside }], idx) => {
  const currentCustomer =
     customerId === "0"
       ? allCustomers.find((c) => c.name === custName)
       : customer;
 
-  const openingBalance = currentCustomer?.openingBal || 0;
-  let runningBalance = openingBalance;
-  let totalDebit = 0;
-  let totalCredit = 0;
+  // Opening as at the START OF THE WINDOW: the account's own opening balance
+  // plus everything that happened before it. With no from-date, `before` is
+  // empty and this is just the account's opening balance.
+  const openingBalance =
+    (currentCustomer?.openingBal || 0) +
+    before.reduce((sum, e) => sum + movement(e), 0);
 
+  let runningBalance = openingBalance;
+
+  // The opening row carries a debit or a credit like any other, so it counts
+  // towards the column totals. Leaving it out meant the Dr and Cr columns
+  // visibly failed to add up to the figures printed beneath them.
+  let totalDebit = openingBalance > 0 ? openingBalance : 0;
+  let totalCredit = openingBalance < 0 ? Math.abs(openingBalance) : 0;
 
     // 🔹 Prepare opening entry
     const computedEntries = [
       {
-        date: entries.length > 0 ? entries[0].date : new Date(),
-        description: "Opening Balance",
+        date: from || (inside.length > 0 ? inside[0].date : new Date()),
+        description: from ? "Opening Balance (as at from-date)" : "Opening Balance",
         debit: openingBalance > 0 ? openingBalance : 0,
         credit: openingBalance < 0 ? Math.abs(openingBalance) : 0,
         balance: Math.abs(openingBalance),
         mode: openingBalance >= 0 ? "Dr" : "Cr",
         isOpening: true,
       },
-      ...entries.map((e) => {
+      ...inside.map((e) => {
         const debit = e.debit || 0;
         const credit = e.credit || 0;
         runningBalance += debit - credit;
@@ -177,65 +202,63 @@ if (data.all) {
     ];
 
     return (
-      <div key={idx} className="mb-10 bg-white border border-gray-300 rounded-xl shadow-sm">
-        <div className="bg-blue-50 border-b border-gray-300 px-4 py-3 flex justify-between">
-          <h3 className="text-lg font-semibold text-gray-800">{custName.toUpperCase()}</h3>
-          <span className="text-sm text-gray-500">({entries.length} Entries)</span>
+      <div key={idx} className="mb-6 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/60 px-4 py-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{custName.toUpperCase()}</h3>
+          <span className="chip">({inside.length} Entries)</span>
         </div>
 
-        <table className="w-full text-sm border-collapse">
+        <div className="overflow-x-auto"><table className="data-table">
           <thead>
-            <tr className="bg-gray-100 border-b border-gray-300">
-              <th className="px-3 py-2 text-left w-[15%]">DATE</th>
-              <th className="px-3 py-2 text-left w-[45%]">DESCRIPTION</th>
-              <th className="px-3 py-2 text-right w-[10%]">DEBIT</th>
-              <th className="px-3 py-2 text-right w-[10%]">CREDIT</th>
-              <th className="px-3 py-2 text-right w-[20%]">BALANCE</th>
+            <tr>
+              <th className="w-[15%]">DATE</th>
+              <th className="w-[45%]">DESCRIPTION</th>
+              <th className="w-[10%] text-right">DEBIT</th>
+              <th className="w-[10%] text-right">CREDIT</th>
+              <th className="w-[20%] text-right">BALANCE</th>
             </tr>
           </thead>
           <tbody>
             {computedEntries.map((entry, i) => (
               <tr
                 key={i}
-                className={`border-b border-gray-200 ${
-                  entry.isOpening ? "bg-yellow-50 font-semibold" : ""
-                }`}
+                className={entry.isOpening ? "row-opening" : ""}
               >
-                <td className="px-3 py-2 text-gray-700">
+                <td className="">
                   {entry.date ? new Date(entry.date).toLocaleDateString("en-IN") : "N/A"}
                 </td>
-                <td className="px-3 py-2 text-gray-700">{entry.description}</td>
-                <td className="px-3 py-2 text-right text-green-700">
+                <td className="">{entry.description}</td>
+                <td className="money-dr">
                   {entry.debit ? formatAmount(entry.debit) : ""}
                 </td>
-                <td className="px-3 py-2 text-right text-red-700">
+                <td className="money-cr">
                   {entry.credit ? formatAmount(entry.credit) : ""}
                 </td>
-                <td className="px-3 py-2 text-right font-semibold text-gray-800">
+                <td className="num font-semibold">
                   {formatAmount(entry.balance)} {entry.mode}
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="font-bold bg-gray-100 border-t border-gray-300">
-              <td colSpan="2" className="px-3 py-2 text-right">
+            <tr>
+              <td colSpan="2" className="num">
                 TOTAL:
               </td>
-              <td className="px-3 py-2 text-right">{formatAmount(totalDebit)}</td>
-              <td className="px-3 py-2 text-right">{formatAmount(totalCredit)}</td>
-              <td className="px-3 py-2 text-right">
+              <td className="num">{formatAmount(totalDebit)}</td>
+              <td className="num">{formatAmount(totalCredit)}</td>
+              <td className="num">
                 {formatAmount(Math.abs(runningBalance))}{" "}
                 {runningBalance >= 0 ? "Dr" : "Cr"}
               </td>
             </tr>
           </tfoot>
-        </table>
+        </table></div>
       </div>
     );
   })
 ) : (
-  <div className="text-center text-gray-500 italic py-8">
+  <div className="empty-state">
     No ledger entries found for this customer within the selected date range.
   </div>
 )}

@@ -12,10 +12,15 @@ customers: [
     name: { type: String, required: true },
     debit: { type: Number, default: 0 },
     credit: { type: Number, default: 0 },
-    custId:{type:String}
+    custId:{type:String},
+    // Per-line narration. Both routes send it and it is written onto the
+    // ledger rows; without it declared here, strict mode dropped it and every
+    // edit re-saved the voucher with blank narrations.
+    narration:{type:String}
   }
 ],
-   paymentType: { type: String }, 
+   narration: { type: String },
+   paymentType: { type: String },
 againstBill:{type:Boolean,default:false},
   acType: {
     type: String,

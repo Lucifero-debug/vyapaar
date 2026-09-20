@@ -1,14 +1,19 @@
 'use client'
 import React from 'react';
-import ReplayIcon from '@mui/icons-material/Replay'; // or use RefreshIcon
+import { RotateCw } from 'lucide-react';
 
 const ReloadButton = () => {
   return (
-    <button onClick={() => location.reload()}>
-      <ReplayIcon sx={{ fontSize: '40px' }} />
+    <button
+      type="button"
+      onClick={() => location.reload()}
+      className="btn-icon"
+      aria-label="Reload page"
+      title="Reload page"
+    >
+      <RotateCw className="h-[18px] w-[18px]" />
     </button>
   );
 };
 
 export default ReloadButton;
-

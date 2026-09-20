@@ -1,6 +1,7 @@
 'use client'
 import React, { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { toDisplay } from '@/lib/balance.mjs'
 import { Button } from "../../components/ui/button"
 import {
   Card, CardContent, CardDescription,
@@ -16,6 +17,7 @@ const PageContent = () => {
   const searchParams = useSearchParams();
   const value = searchParams.get('value');
 
+  const [tab, setTab] = useState('account');
   const [id, setId] = useState('');
   const [name, setName] = useState('');
   const [short, setShort] = useState('');
@@ -23,6 +25,8 @@ const PageContent = () => {
   const [openBal, setOpenBal] = useState(0);
   const [openingMode,setOpeningMode] = useState('')
   const [lastMode,setLastMode] = useState('')
+  // Display only: what the books currently say this party owes.
+  const [running, setRunning] = useState(null)
   const [lastBal, setLastBal] = useState(0);
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState(0);
@@ -53,8 +57,15 @@ const PageContent = () => {
           setName(d.name || '');
           setShort(d.short || '');
           setGroup(d.group || '');
-          setOpenBal(d.openingBal || 0);
-          setLastBal(d.lastBal || 0);
+          // Stored balances are signed; the form edits magnitude + Dr/Cr.
+          const opening  = toDisplay(d.openingBal);
+          // The editable field is last year's closing balance (master data),
+          // NOT the live running balance -- loading the latter here is what
+          // let an unrelated edit write it straight back and clobber it.
+          const lastYear = toDisplay(d.lastYearBal);
+          setOpenBal(opening.amount);
+          setLastBal(lastYear.amount);
+          setRunning(toDisplay(d.lastBal));
           setAddress(d.address || '');
           setPincode(d.pincode || 0);
           setPhone(d.phone ?? null);
@@ -69,8 +80,8 @@ const PageContent = () => {
           setInterest(d.interest || 0);
           setDiscount(d.discount || 0);
           setDealerType(d.dealerType || '')
-          setOpeningMode(d.openingMode || '');
-          setLastMode(d.lastMode || '')
+          setOpeningMode(opening.mode);
+          setLastMode(lastYear.mode)
         })
         .catch(error => console.error('Error fetching customer data:', error));
     }
@@ -104,70 +115,42 @@ const PageContent = () => {
   }
 
   return (
-<div className="w-full flex justify-center">
-  <Tabs defaultValue="account" className="flex flex-col md:flex-row w-[95vw] md:w-[80vw]">
+<div className="page-shell">
+  <header className="page-header">
+    <div>
+      <h1 className="page-title">Customer</h1>
+      <p className="page-subtitle">Name, balances and address.</p>
+    </div>
+  </header>
+  <Tabs value={tab} onValueChange={setTab} className="panel flex w-full flex-col overflow-hidden md:flex-row">
     {/* Tabs List */}
-    <TabsList
-      className="
-        flex 
-        md:flex-col 
-        justify-start 
-        md:w-[200px] 
-        w-full 
-        overflow-x-auto 
-        h-28
-        border-b md:border-b-0 md:border-r 
-        border-gray-300 
-        rounded-none 
-        bg-white
-      "
-    >
+    <TabsList className="flex h-auto w-full shrink-0 flex-row gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-2 md:w-[210px] md:flex-col md:border-b-0 md:border-r">
       <TabsTrigger
         value="account"
-        className="
-          flex-1 
-          md:w-full 
-          justify-center md:justify-start 
-          px-4 py-3 
-          text-sm 
-          whitespace-nowrap
-          rounded-none 
-          data-[state=active]:bg-blue-100 
-          data-[state=active]:text-blue-600
-        "
+        className="flex-1 justify-center whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none md:w-full md:flex-none md:justify-start"
       >
         Standard
       </TabsTrigger>
       <TabsTrigger
         value="password"
-        className="
-          flex-1 
-          md:w-full 
-          justify-center md:justify-start 
-          px-4 py-3 
-          text-sm 
-          whitespace-nowrap
-          rounded-none 
-          data-[state=active]:bg-blue-100 
-          data-[state=active]:text-blue-600
-        "
+        className="flex-1 justify-center whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none md:w-full md:flex-none md:justify-start"
       >
         Address
       </TabsTrigger>
     </TabsList>
 
     {/* Tab Content */}
-    <div className="flex-1 p-3 md:p-5 overflow-auto">
+    <div className="flex-1 overflow-auto p-4 md:p-6">
       {/* Standard Tab */}
       <TabsContent value="account" className="h-full">
-        <Card>
-          <CardHeader>
+        <Card className="border-0 shadow-none">
+          <CardHeader className="px-0 pt-0">
             <CardTitle>Standard</CardTitle>
             <CardDescription>
               {value ? "Update customer details" : "Add new customer"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4 px-0">
             <div className="space-y-1">
               <Label htmlFor="name">Name</Label>
               <Input id="name" value={name} onChange={e => setName(e.target.value)} />
@@ -191,7 +174,7 @@ const PageContent = () => {
                     <select
       value={openingMode}
       onChange={(e) => setOpeningMode(e.target.value)}
-      className="w-full border rounded-md h-10 px-2 text-gray-700 bg-white"
+      className="field-select"
     >
       <option value="">Select</option>
       <option value="Dr">Debit</option>
@@ -201,13 +184,14 @@ const PageContent = () => {
               <div className="space-y-1">
                 <Label>Last Year Balance</Label>
                 <Input type='number' value={lastBal} onChange={e => setLastBal(+e.target.value)} />
+                <p className="field-hint">Reference only. Does not affect the running balance.</p>
               </div>
               <div className="space-y-1">
                 <Label>Dr/Cr</Label>
                     <select
       value={lastMode}
       onChange={(e) => setLastMode(e.target.value)}
-      className="w-full border rounded-md h-10 px-2 text-gray-700 bg-white"
+      className="field-select"
     >
       <option value="">Select</option>
       <option value="Dr">Debit</option>
@@ -216,22 +200,33 @@ const PageContent = () => {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-end">
-            <Button>Next</Button>
+          <CardFooter className="flex-wrap justify-between gap-3 px-0 pb-0">
+            {running ? (
+              <div className="text-sm">
+                <span className="field-label">Current balance</span>
+                <p className="font-semibold tabular-nums text-foreground">
+                  {running.amount.toFixed(2)} {running.mode}
+                </p>
+                <p className="field-hint">Maintained by invoices and vouchers.</p>
+              </div>
+            ) : (
+              <span />
+            )}
+            <Button onClick={() => setTab('password')}>Next</Button>
           </CardFooter>
         </Card>
       </TabsContent>
 
       {/* Address Tab */}
       <TabsContent value="password" className="h-full">
-        <Card className="border-2 border-gray-300">
-          <CardHeader>
+        <Card className="border-0 shadow-none">
+          <CardHeader className="px-0 pt-0">
             <CardTitle>Address</CardTitle>
             <CardDescription>
               {value ? "Edit address and contact" : "Enter address details"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4 px-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {[
                 { label: 'Address', val: address, fn: setAddress, type: 'text' },
@@ -260,7 +255,7 @@ const PageContent = () => {
               ))}
             </div>
           </CardContent>
-          <CardFooter className="flex justify-end">
+          <CardFooter className="justify-end px-0 pb-0">
             <Button onClick={handleSave}>Save</Button>
           </CardFooter>
         </Card>
@@ -275,7 +270,7 @@ const PageContent = () => {
 };
 
 const Page = () => (
-  <Suspense fallback={<div>Loading...</div>}>
+  <Suspense fallback={<div className="page-shell text-sm text-muted-foreground">Loading...</div>}>
     <PageContent />
   </Suspense>
 );

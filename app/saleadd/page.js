@@ -284,6 +284,9 @@ const addPartyTax = () => {
     return;
   }
 
+  // DELIBERATE: overheads are charged AFTER tax, on the GST-inclusive value,
+  // and are not themselves taxed. This was reviewed and chosen; it is not an
+  // oversight, so please do not "correct" it to a pre-GST base without asking.
   const base = selectedItem.reduce(
     (sum, item) => sum + Number(item.total || 0),
     0
@@ -355,14 +358,18 @@ const addPartyTax = () => {
     useEffect(() => {
         const baseAmount     = parseFloat(totalAmount) || 0;
         const partyTaxTotal  = partyTaxes.reduce((acc, tax) => acc + parseFloat(tax.total || 0), 0);
-        const finalAmt       = baseAmount + partyTaxTotal;
+        // Freight was collected, stored and printed under Order Details, and
+        // then left out of the amount actually charged. Added after tax, the
+        // same way overheads are -- see addPartyTax.
+        const freightAmount  = parseFloat(freight) || 0;
+        const finalAmt       = baseAmount + partyTaxTotal + freightAmount;
 
         setFinalAmount(finalAmt.toFixed(2));
 
         const receivedAmt = parseFloat(received) || 0;
         const balance     = parseFloat((finalAmt - receivedAmt).toFixed(2));
         setBalanceDue(balance);
-    }, [totalAmount, gst, partyTaxes, received]);
+    }, [totalAmount, gst, partyTaxes, received, freight]);
 
     const handleTaxTypeChange = (e) => {
         setTaxType(e.target.value);
@@ -462,6 +469,9 @@ const saveItem = (e) => {
 
         const invoiceData = {
             invoiceNo,
+            // The number the page opened with. It identifies the row on an
+            // edit, because invoiceNo itself is editable on this form.
+            originalInvoiceNo: value || undefined,
             date,
             customer: {
                 name:   selectedCustomer.name,
@@ -510,8 +520,16 @@ const saveItem = (e) => {
             if (result.success) {
                 setSelectedItem([]);
                 setPartyTaxes([]);
+                // The server settles the number -- a clash with a concurrent
+                // invoice means the one it assigned differs from the one typed.
+                const savedNo =
+                    result.invoice?.invoiceNo ??
+                    result.updatedInvoice?.invoiceNo ??
+                    invoiceNo;
+                if (savedNo !== invoiceNo) setInvoiceNo(savedNo);
+
                 const query = new URLSearchParams({
-                    invoiceNo,
+                    invoiceNo: savedNo,
                     date,
                     customer: selectedCustomer.name,
                     phone,
@@ -595,23 +613,30 @@ const handleDispatchSave = () => {
             <Suspense fallback={null}>
                 <InvoiceSearchParams onValue={setValue} onReady={setIsValueReady} />
             </Suspense>
-            <div className='flex flex-col gap-6 p-6 bg-gray-50 min-h-screen'>
+            <div className='page-shell-wide flex flex-col gap-6'>
+                <header className='page-header mb-0'>
+                    <div>
+                        <h1 className='page-title'>Sale Invoice</h1>
+                        <p className='page-subtitle'>Bill a customer and record the sale.</p>
+                    </div>
+                </header>
+
                 {/* Invoice & Date */}
-                <div className='flex gap-6'>
-                    <div className='flex flex-col'>
-                        <label className='text-gray-600 font-medium mb-1'>Invoice No:</label>
+                <div className='panel panel-body flex flex-wrap gap-5'>
+                    <div className='field w-40'>
+                        <label className='field-label mb-1'>Invoice No</label>
                         <input 
                             type='number' 
-                            className='h-10 px-3 border rounded-lg shadow-sm' 
+                            className='field-input' 
                             value={invoiceNo} 
                             onChange={(e) => setInvoiceNo(e.target.value)} 
                         />
                     </div>
-                    <div className='flex flex-col'>
-                        <label className='text-gray-600 font-medium mb-1'>Date</label>
+                    <div className='field w-48'>
+                        <label className='field-label mb-1'>Date</label>
                         <input 
                             type='date' 
-                            className='h-10 px-3 border rounded-lg shadow-sm' 
+                            className='field-input' 
                             value={date} 
                             onChange={(e) => setDate(e.target.value)} 
                         />
@@ -619,10 +644,10 @@ const handleDispatchSave = () => {
                 </div>
 
                 {/* Customer & Item Selection */}
-                <div className='grid grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-md'>
+                <div className='panel panel-body grid grid-cols-1 gap-5 sm:grid-cols-2'>
                     {/* Customer Dropdown */}
                     <div className='flex flex-col'>
-                        <label className='text-gray-600 font-medium mb-1'>Customer</label>
+                        <label className='field-label mb-1'>Customer</label>
                         <select 
                             value={selectedCustomer.name || ''} 
                             onChange={(e) => {
@@ -630,7 +655,7 @@ const handleDispatchSave = () => {
                                 const customers = customer.find(cust => cust.name === selectedName);
                                 setSelectedCustomer(customers || {});
                             }} 
-                            className='h-10 px-3 border rounded-lg shadow-sm'
+                            className='field-select'
                         >
                             <option value=''>Select Customer</option>
                             {customer.map((cust) => (
@@ -640,9 +665,9 @@ const handleDispatchSave = () => {
                     </div>
 
                     <div className='flex justify-between items-center'>
-                        <h2 className='text-lg font-medium text-gray-700'>State Of Supply</h2>
+                        <h2 className='text-sm font-medium text-foreground'>State Of Supply</h2>
                         <select 
-                            className='w-32 h-10 px-2 border rounded-lg' 
+                            className='field-select w-36' 
                             value={stateOfSupply} 
                             onChange={(e) => setStateOfSupply(e.target.value)}
                         >
@@ -654,25 +679,25 @@ const handleDispatchSave = () => {
 
                     <div className='flex justify-between items-center'>
                         <div className='flex items-center gap-2'>
-                            <label htmlFor='local' className='text-gray-700'>Local</label>
+                            <label htmlFor='local' className='text-sm font-medium text-foreground'>Local</label>
                             <input 
                                 type='radio' 
                                 id='local' 
                                 name='location' 
                                 value='local'
-                                className='w-5 h-5' 
+                                className='field-check' 
                                 checked={taxType === 'local'} 
                                 onChange={handleTaxTypeChange} 
                             />
                         </div>
                         <div className='flex items-center gap-2'>
-                            <label htmlFor='central' className='text-gray-700'>Central</label>
+                            <label htmlFor='central' className='text-sm font-medium text-foreground'>Central</label>
                             <input 
                                 type='radio' 
                                 id='central' 
                                 name='location' 
                                 value='central'
-                                className='w-5 h-5' 
+                                className='field-check' 
                                 checked={taxType === 'central'} 
                                 onChange={handleTaxTypeChange} 
                             />
@@ -681,14 +706,14 @@ const handleDispatchSave = () => {
 
                     {/* Item Dropdown */}
                     <div className='flex flex-col'>
-                        <label className='text-gray-600 font-medium mb-1'>Add Item</label>
+                        <label className='field-label mb-1'>Add Item</label>
                         <select 
                             value={itemName} 
                             onChange={(e) => { 
                                 setItemName(e.target.value); 
                                 saveItem(e); 
                             }} 
-                            className='h-10 px-3 border rounded-lg shadow-sm'
+                            className='field-select'
                         >
                             <option value=''>Select an Item</option>
                             {item.map((items) => (
@@ -699,26 +724,26 @@ const handleDispatchSave = () => {
                 </div>
 
                 {showDescPopup && (
-                    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
-                            <h2 className="text-lg font-semibold mb-4">Add Product Description</h2>
+                    <div className="modal-overlay">
+                        <div className="modal-card">
+                            <h2 className="modal-title mb-3">Add Product Description</h2>
                             <textarea
                                 value={descriptionText}
                                 onChange={(e) => setDescriptionText(e.target.value)}
                                 rows={4}
-                                className="w-full border px-3 py-2 rounded-lg mb-4"
+                                className="field-input mb-4"
                                 placeholder="Enter description here..."
                             />
                             <div className="flex justify-end gap-2">
                                 <button
                                     onClick={() => setShowDescPopup(false)}
-                                    className="px-4 py-2 bg-gray-300 rounded"
+                                    className="btn btn-secondary"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleSaveDescription}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded"
+                                    className="btn btn-primary"
                                 >
                                     Save
                                 </button>
@@ -728,90 +753,93 @@ const handleDispatchSave = () => {
                 )}
 
                 {showQuantityPack && (
-                    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
+                    <div className="modal-overlay">
+                        <div className="modal-card">
                             <div className='flex'>
-                                <h2 className="text-lg font-semibold mb-4">Enter Quantity Per Pack</h2>
+                                <h2 className="modal-title mb-3">Enter Quantity Per Pack</h2>
                                 <input
                                     type="number"
                                     value={quantityPerPack}
                                     onChange={(e) => setQuantityPerPack(e.target.value)}
                                     placeholder="Quantity per pack"
-                                    className="w-full border px-3 py-2 rounded-lg mb-4"
+                                    className="field-input mb-4"
                                 />
                             </div>
                             <div className='flex'>
-                                <h2 className="text-lg font-semibold mb-4">Enter No Of Packs</h2>
+                                <h2 className="modal-title mb-3">Enter No Of Packs</h2>
                                 <input
                                     type="number"
                                     value={noOfPack}
                                     onChange={(e) => setNoOfPack(e.target.value)}
                                     placeholder="Number of packs"
-                                    className="w-full border px-3 py-2 rounded-lg mb-4"
+                                    className="field-input mb-4"
                                 />
                             </div>
                             <div className="flex justify-end gap-2">
-                                <button onClick={() => setShowQuantityPack(false)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                                <button onClick={handleQuantityPackSave} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                                <button onClick={() => setShowQuantityPack(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={handleQuantityPackSave} className="btn btn-primary">Save</button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div className='flex flex-col gap-3'>
-                    <h1 className='text-2xl font-bold text-gray-700'>Selected Items</h1>
+                <section className='panel'>
+                    <div className='panel-head'>
+                        <h2 className='panel-title'>Selected Items</h2>
+                    </div>
+                    <div className='panel-body flex flex-col gap-3'>
 
                     {selectedItem && selectedItem.length > 0 ? (
-                        <div className='overflow-x-auto'>
-                            <table className='min-w-full table-auto border-collapse border border-gray-300 text-left'>
+                        <div className='table-wrap'>
+                            <table className='data-table'>
                                 <thead>
-                                    <tr className='bg-blue-100 text-gray-700 uppercase text-sm leading-normal'>
-                                        <th className='py-2 px-4 border border-gray-300'>Name</th>
-                                        <th className='py-2 px-4 border border-gray-300'>Quantity</th>
-                                        <th className='py-2 px-4 border border-gray-300'>Rate</th>
-                                        <th className='py-2 px-4 border border-gray-300'>Discount (%)</th>
-                                        <th className='py-2 px-4 border border-gray-300'>HSN Code</th>
-                                        <th className='py-2 px-4 border border-gray-300'>Total</th>
-                                        <th className='py-2 px-4 border border-gray-300'>Action</th>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th className='text-right'>Quantity</th>
+                                        <th className='text-right'>Rate</th>
+                                        <th className='text-right'>Discount (%)</th>
+                                        <th>HSN Code</th>
+                                        <th className='text-right'>Total</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {selectedItem.map((items, index) => (
-                                        <tr key={index} className='even:bg-gray-50 odd:bg-white'>
-                                            <td className='py-2 px-4 border border-gray-300'>{items.name}</td>
-                                            <td className='py-2 px-4 border border-gray-300'>
+                                        <tr key={index}>
+                                            <td>{items.name}</td>
+                                            <td>
                                                 <input 
                                                     type='number' 
                                                     min='1' 
-                                                    className='w-16 px-2 border rounded' 
+                                                    className='field-input field-input-sm num w-20' 
                                                     value={items.quantity} 
                                                     onChange={(e) => handleItemFieldChange(index, 'quantity', e.target.value)}
                                                 />
                                             </td>
-                                            <td className='py-2 px-4 border border-gray-300'>
+                                            <td>
                                                 <input 
                                                     type='number' 
                                                     min='0' 
-                                                    className='w-20 px-2 border rounded' 
+                                                    className='field-input field-input-sm num w-24' 
                                                     value={items.cost} 
                                                     onChange={(e) => handleItemFieldChange(index, 'cost', e.target.value)}
                                                 />
                                             </td>
-                                            <td className='py-2 px-4 border border-gray-300'>
+                                            <td>
                                                 <input
                                                     type='number'
                                                     min='0'
                                                     max='100'
-                                                    className='w-16 px-2 border rounded'
+                                                    className='field-input field-input-sm num w-20'
                                                     value={items.discount}
                                                     onChange={(e) => handleItemFieldChange(index, 'discount', e.target.value)}
                                                 />
                                             </td>
-                                            <td className='py-2 px-4 border border-gray-300'>{items.hsn}</td>
-                                            <td className='py-2 px-4 border border-gray-300'>{Number(items.total).toFixed(2)}</td>
-                                            <td className='py-2 px-4 border border-gray-300'>
+                                            <td>{items.hsn}</td>
+                                            <td className='num font-medium'>{Number(items.total).toFixed(2)}</td>
+                                            <td>
                                                 <button 
-                                                    className='bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600' 
+                                                    className='btn btn-danger btn-sm' 
                                                     onClick={() => handleRemove(index)}
                                                 >
                                                     Remove
@@ -823,91 +851,92 @@ const handleDispatchSave = () => {
                             </table>
                         </div>
                     ) : (
-                        <h1 className='text-gray-500'>No Items Selected</h1>
+                        <div className='empty-state'>No items added yet.</div>
                     )}
-                </div>
+                    </div>
+                </section>
 
-                <div className="grid grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-md">
+                <div className="panel panel-body grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">GR Date</label>
-                        <input type="date" className="h-10 px-3 border rounded-lg shadow-sm" value={grDate} onChange={(e) => setGrDate(e.target.value)} />
+                        <label className="field-label mb-1">GR Date</label>
+                        <input type="date" className="field-input" value={grDate} onChange={(e) => setGrDate(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">GR No</label>
-                        <input type="text" className="h-10 px-3 border rounded-lg shadow-sm" value={grNo} onChange={(e) => setGrNo(e.target.value)} />
+                        <label className="field-label mb-1">GR No</label>
+                        <input type="text" className="field-input" value={grNo} onChange={(e) => setGrNo(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">Transport</label>
-                        <input type="text" className="h-10 px-3 border rounded-lg shadow-sm" value={transport} onChange={(e) => setTransport(e.target.value)} />
+                        <label className="field-label mb-1">Transport</label>
+                        <input type="text" className="field-input" value={transport} onChange={(e) => setTransport(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">Pvt Mark</label>
-                        <input type="text" className="h-10 px-3 border rounded-lg shadow-sm" value={pvtMark} onChange={(e) => setPvtMark(e.target.value)} />
+                        <label className="field-label mb-1">Pvt Mark</label>
+                        <input type="text" className="field-input" value={pvtMark} onChange={(e) => setPvtMark(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">Case</label>
-                        <input type="text" className="h-10 px-3 border rounded-lg shadow-sm" value={caseDetails} onChange={(e) => setCaseDetails(e.target.value)} />
+                        <label className="field-label mb-1">Case</label>
+                        <input type="text" className="field-input" value={caseDetails} onChange={(e) => setCaseDetails(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">Freight</label>
-                        <input type="text" className="h-10 px-3 border rounded-lg shadow-sm" value={freight} onChange={(e) => setFreight(e.target.value)} />
+                        <label className="field-label mb-1">Freight</label>
+                        <input type="text" className="field-input" value={freight} onChange={(e) => setFreight(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">E-Way Bill Date</label>
-                        <input type="date" className="h-10 px-3 border rounded-lg shadow-sm" value={ewayBillDate} onChange={(e) => setEwayBillDate(e.target.value)} />
+                        <label className="field-label mb-1">E-Way Bill Date</label>
+                        <input type="date" className="field-input" value={ewayBillDate} onChange={(e) => setEwayBillDate(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">E-Way Bill No</label>
-                        <input type="text" className="h-10 px-3 border rounded-lg shadow-sm" value={ewayBillNo} onChange={(e) => setEwayBillNo(e.target.value)} />
+                        <label className="field-label mb-1">E-Way Bill No</label>
+                        <input type="text" className="field-input" value={ewayBillNo} onChange={(e) => setEwayBillNo(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">Order Date</label>
-                        <input type="date" className="h-10 px-3 border rounded-lg shadow-sm" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
+                        <label className="field-label mb-1">Order Date</label>
+                        <input type="date" className="field-input" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">Order No</label>
-                        <input type="text" className="h-10 px-3 border rounded-lg shadow-sm" value={orderNo} onChange={(e) => setOrderNo(e.target.value)} />
+                        <label className="field-label mb-1">Order No</label>
+                        <input type="text" className="field-input" value={orderNo} onChange={(e) => setOrderNo(e.target.value)} />
                     </div>
                     <div className="flex flex-col">
-                        <label className="text-gray-600 font-medium mb-1">Weight (kg)</label>
-                        <input type="number" className="h-10 px-3 border rounded-lg shadow-sm" value={weight} onChange={(e) => setWeight(e.target.value)} />
+                        <label className="field-label mb-1">Weight (kg)</label>
+                        <input type="number" className="field-input" value={weight} onChange={(e) => setWeight(e.target.value)} />
                     </div>
                 </div>
 
                 {/* Payment & Supply Section */}
                 <div className="flex gap-6 flex-wrap">
                     {/* Total Summary Card */}
-                    <div className="flex-1 bg-white p-6 rounded-xl shadow-md flex flex-col gap-4 min-w-[300px]">
+                    <div className="panel panel-body flex flex-1 flex-col gap-4 min-w-[280px]">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-medium text-gray-700">Total Amount</h2>
-                            <div className="w-32 h-10 px-2 border rounded-lg text-right bg-gray-100 flex items-center justify-end font-medium">
+                            <h2 className="text-sm font-medium text-foreground">Total Amount</h2>
+                            <div className="flex h-10 w-36 items-center justify-end rounded-lg border border-border bg-muted px-3 text-sm font-semibold tabular-nums">
                                 ₹{finalAmount}
                             </div>
                         </div>
                         <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-medium text-gray-700">Received</h2>
+                            <h2 className="text-sm font-medium text-foreground">Received</h2>
                             <input
                                 type="number"
-                                className="w-32 h-10 px-2 border rounded-lg text-right"
+                                className="field-input num w-36"
                                 value={received || ''}
                                 onChange={(e) => setReceived(parseFloat(e.target.value) || 0)}
                                 placeholder="0"
                             />
                         </div>
                         <div className="flex justify-between items-center border-t pt-2">
-                            <h2 className="text-lg font-semibold text-gray-800">Balance Due</h2>
-                            <div className="w-32 h-10 px-2 border rounded-lg text-right bg-red-50 border-red-200 flex items-center justify-end font-semibold text-red-600">
+                            <h2 className="text-sm font-semibold text-foreground">Balance Due</h2>
+                            <div className="flex h-10 w-36 items-center justify-end rounded-lg border border-destructive/30 bg-destructive/10 px-3 text-sm font-semibold tabular-nums text-destructive">
                                 ₹{balanceDue}
                             </div>
                         </div>
                     </div>
 
                     {/* Tax Type + GST Card */}
-                    <div className='flex-1 bg-white p-6 rounded-xl shadow-md flex flex-col gap-4'>
+                    <div className='panel panel-body flex flex-1 flex-col gap-4 min-w-[280px]'>
                         <div className='flex justify-between items-center'>
-                            <h2 className='text-lg font-medium text-gray-700'>Payment Type</h2>
+                            <h2 className='text-sm font-medium text-foreground'>Payment Type</h2>
                             <select 
-                                className='w-32 h-10 px-2 border rounded-lg' 
+                                className='field-select w-36' 
                                 value={paymentType} 
                                 onChange={(e) => setPaymentType(e.target.value)}
                             >
@@ -916,17 +945,17 @@ const handleDispatchSave = () => {
                             </select>
                         </div>
                         <div className='flex flex-col'>
-                            <label className='text-gray-600 font-medium mb-1'>Phone</label>
+                            <label className='field-label mb-1'>Phone</label>
                             <input 
-                                className='h-10 px-3 border rounded-lg shadow-sm bg-gray-100' 
+                                className='field-input' 
                                 value={selectedCustomer.phone || ''} 
                                 readOnly 
                             />
                         </div>
                         <div className='flex flex-col'>
-                            <label className='text-gray-600 font-medium mb-1'>Email</label>
+                            <label className='field-label mb-1'>Email</label>
                             <input 
-                                className='h-10 px-3 border rounded-lg shadow-sm bg-gray-100' 
+                                className='field-input' 
                                 value={selectedCustomer.email || ''} 
                                 readOnly 
                             />
@@ -934,64 +963,71 @@ const handleDispatchSave = () => {
                     </div>
                 </div>
 
-                <div className='mt-6'>
-                    <h2 className='font-bold text-xl mb-2'>HSN Code-wise Totals</h2>
-                    <div className='border border-gray-300 rounded-md overflow-hidden'>
-                        <table className='min-w-full table-auto border-collapse border border-gray-300 text-left'>
+                <section className='panel'>
+                    <div className='panel-head'>
+                        <h2 className='panel-title'>HSN Code-wise Totals</h2>
+                    </div>
+                    <div className='panel-body'>
+                    <div className='table-wrap'>
+                        <table className='data-table'>
                             <thead>
-                                <tr className='bg-blue-100 text-gray-700 uppercase text-sm leading-normal'>
-                                    <th className='py-2 px-4 border border-gray-300'>HSN Code</th>
-                                    <th className='py-2 px-4 border border-gray-300'>Taxable Amount</th>
-                                    <th className='py-2 px-4 border border-gray-300'>GST (%)</th>
-                                    <th className='py-2 px-4 border border-gray-300'>GST Amount</th>
-                                    <th className='py-2 px-4 border border-gray-300'>Total</th>
+                                <tr>
+                                    <th>HSN Code</th>
+                                    <th className='text-right'>Taxable Amount</th>
+                                    <th className='text-right'>GST (%)</th>
+                                    <th className='text-right'>GST Amount</th>
+                                    <th className='text-right'>Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {Object.entries(hsnTotals).map(([hsnCode, data]) => (
-                                    <tr key={hsnCode} className='even:bg-gray-50 odd:bg-white'>
-                                        <td className='py-2 px-4 border border-gray-300'>{hsnCode}</td>
-                                        <td className='py-2 px-4 border border-gray-300 font-medium text-gray-700'>
+                                    <tr key={hsnCode}>
+                                        <td>{hsnCode}</td>
+                                        <td className='num'>
                                             {((data.total || 0) - (data.gstAmount || 0)).toFixed(2)}
                                         </td>
-                                        <td className='py-2 px-4 border border-gray-300'>{data.gstRate || 0}</td>
-                                        <td className='py-2 px-4 border border-gray-300'>{(data.gstAmount || 0).toFixed(2)}</td>
-                                        <td className='py-2 px-4 border border-gray-300'>{(data.total || 0).toFixed(2)}</td>
+                                        <td className='num'>{data.gstRate || 0}</td>
+                                        <td className='num'>{(data.gstAmount || 0).toFixed(2)}</td>
+                                        <td className='num font-medium'>{(data.total || 0).toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                </div>
+                    </div>
+                </section>
 
                 {/* Party Taxes Section */}
-                <div className='flex flex-col gap-3 mt-6'>
-                    <h1 className='font-bold text-2xl'>Overhead Sale</h1>
+                <section className='panel'>
+                    <div className='panel-head'>
+                        <h2 className='panel-title'>Overheads</h2>
+                    </div>
+                    <div className='panel-body flex flex-col gap-3'>
 
-                    <div className='flex gap-2 mb-2'>
+                    <div className='flex flex-wrap items-end gap-2'>
                         <input
                             type='text'
                             placeholder='Overhead Name'
-                            className='border border-black px-2 py-1'
+                            className='field-input w-56'
                             value={newTaxName}
                             onChange={(e) => setNewTaxName(e.target.value)}
                         />
                         <input
                             type='number'
                             placeholder='Rate %'
-                            className='border border-black px-2 py-1 w-20'
+                            className='field-input w-24'
                             value={newTaxRate}
                             onChange={(e) => setNewTaxRate(e.target.value)}
                         />
                         <input
                             type='number'
                             placeholder='Amount'
-                            className='border border-black px-2 py-1 w-20'
+                            className='field-input w-24'
                             value={newTaxAmount}
                             onChange={(e) => setNewTaxAmount(e.target.value)}
                         />
                         <button
-                            className='bg-green-500 text-white px-3 py-1 rounded'
+                            className='btn btn-success'
                             onClick={addPartyTax}
                             type='button'
                         >
@@ -1000,30 +1036,30 @@ const handleDispatchSave = () => {
                     </div>
 
                     {partyTaxes.length > 0 ? (
-                        <table className='w-full border border-black text-left'>
+                        <div className='table-wrap'><table className='data-table'>
                             <thead>
-                                <tr className='bg-gray-200'>
-                                    <th className='border border-black px-2 py-1'>Tax Name</th>
-                                    <th className='border border-black px-2 py-1'>Rate %</th>
-                                    <th className='border border-black px-2 py-1'>Amount</th>
-                                    <th className='border border-black px-2 py-1'>Total</th>
-                                    <th className='border border-black px-2 py-1'>Action</th>
+                                <tr>
+                                    <th>Tax Name</th>
+                                    <th className='text-right'>Rate %</th>
+                                    <th className='text-right'>Amount</th>
+                                    <th className='text-right'>Total</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {partyTaxes.map((tax, index) => (
-                                    <tr key={`${tax.name}-${index}`} className='even:bg-gray-50 odd:bg-white'>
-                                        <td className='border border-black px-2 py-1'>{tax.name}</td>
-                                        <td className='border border-black px-2 py-1'>
+                                    <tr key={`${tax.name}-${index}`}>
+                                        <td>{tax.name}</td>
+                                        <td>
                                             {tax.rate !== '' ? `${tax.rate}%` : 'NA'}
                                         </td>
-                                        <td className='border border-black px-2 py-1'>
+                                        <td>
                                             {tax.amount !== '' ? `₹${tax.amount}` : 'NA'}
                                         </td>
-                                        <td className='border border-black px-2 py-1'>{tax.total}</td>
-                                        <td className='border border-black px-2 py-1'>
+                                        <td className='num'>{tax.total}</td>
+                                        <td>
                                             <button
-                                                className='bg-red-500 text-white px-2 py-1 rounded active:scale-110'
+                                                className='btn btn-danger btn-sm px-2'
                                                 onClick={() => {
                                                     const updatedTaxes = partyTaxes.filter((_, idx) => idx !== index);
                                                     setPartyTaxes(updatedTaxes);
@@ -1035,53 +1071,56 @@ const handleDispatchSave = () => {
                                     </tr>
                                 ))}
                             </tbody>
-                        </table>
+                        </table></div>
                     ) : (
-                        <h1>No Party Taxes Added</h1>
+                        <div className='empty-state'>No overheads added.</div>
                     )}
-                </div>
+                    </div>
+                </section>
 
                 {/* Save Button */}
+                <div className='sticky bottom-0 -mx-4 mt-2 flex border-t border-border bg-card/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6'>
                 <button 
-                    className='bg-blue-600 text-white px-6 py-3 rounded-lg w-fit mx-auto text-lg hover:bg-blue-700' 
+                    className='btn btn-primary mx-auto h-11 w-fit px-8 text-base' 
                     onClick={handleSave}
                 >
                     Save Invoice
                 </button>
+                </div>
 
                 {showShippedPopup && (
-                    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
-                            <h2 className="text-lg font-semibold mb-4">Enter Shipped To</h2>
+                    <div className="modal-overlay">
+                        <div className="modal-card">
+                            <h2 className="modal-title mb-3">Enter Shipped To</h2>
                             <input
                                 type="text"
                                 value={shippedTo}
                                 onChange={(e) => setShippedTo(e.target.value)}
                                 placeholder="Shipping address"
-                                className="w-full border px-3 py-2 rounded-lg mb-4"
+                                className="field-input mb-4"
                             />
                             <div className="flex justify-end gap-2">
-                                <button onClick={() => setShowShippedPopup(false)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                                <button onClick={handleShippedSave} className="px-4 py-2 bg-blue-600 text-white rounded">Next</button>
+                                <button onClick={() => setShowShippedPopup(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={handleShippedSave} className="btn btn-primary">Next</button>
                             </div>
                         </div>
                     </div>
                 )}
 
                 {showDispatchPopup && (
-                    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-lg w-[90%] max-w-md shadow-lg">
-                            <h2 className="text-lg font-semibold mb-4">Enter Dispatch From</h2>
+                    <div className="modal-overlay">
+                        <div className="modal-card">
+                            <h2 className="modal-title mb-3">Enter Dispatch From</h2>
                             <input
                                 type="text"
                                 value={dispatchFrom}
                                 onChange={(e) => setDispatchFrom(e.target.value)}
                                 placeholder="Dispatch location"
-                                className="w-full border px-3 py-2 rounded-lg mb-4"
+                                className="field-input mb-4"
                             />
                             <div className="flex justify-end gap-2">
-                                <button onClick={() => setShowDispatchPopup(false)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                                <button onClick={handleDispatchSave} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                                <button onClick={() => setShowDispatchPopup(false)} className="btn btn-secondary">Cancel</button>
+                                <button onClick={handleDispatchSave} className="btn btn-primary">Save</button>
                             </div>
                         </div>
                     </div>

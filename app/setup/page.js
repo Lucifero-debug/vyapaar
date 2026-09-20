@@ -47,32 +47,54 @@ const Page = () => {
   };
 
   return (
-    <div className="p-6 max-w-xl mx-auto bg-white rounded-lg shadow-lg border">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Invoice Option Toggles</h2>
-      <div className="flex flex-col gap-4">
-        {Object.keys(optionLabels).map((key) => (
-          <label
-            key={key}
-            className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-md border hover:shadow transition-all"
+    <div className="page-shell max-w-2xl">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Setup</h1>
+          <p className="page-subtitle">Choose which fields appear while billing.</p>
+        </div>
+      </header>
+
+      <section className="panel">
+        <div className="panel-head">
+          <h2 className="panel-title">Invoice options</h2>
+        </div>
+        <div className="panel-body flex flex-col gap-2">
+          {Object.keys(optionLabels).map((key) => (
+            <label
+              key={key}
+              className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-primary/40 hover:bg-accent/40"
+            >
+              <span className="text-sm font-medium text-foreground">{optionLabels[key]}</span>
+              <input
+                type="checkbox"
+                name={key}
+                checked={options[key]}
+                onChange={handleChange}
+                className="field-check"
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel mt-5 border-destructive/30">
+        <div className="panel-head border-destructive/30">
+          <h2 className="panel-title text-destructive">Danger zone</h2>
+        </div>
+        <div className="panel-body flex flex-wrap items-center justify-between gap-4">
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Permanently deletes every item, customer, invoice and HSN record. This cannot be undone.
+          </p>
+          <button
+            onClick={handleClearData}
+            disabled={loadings}
+            className="btn btn-danger"
           >
-            <span className="text-gray-700 text-base font-medium">{optionLabels[key]}</span>
-            <input
-              type="checkbox"
-              name={key}
-              checked={options[key]}
-              onChange={handleChange}
-              className="w-5 h-5 accent-blue-600"
-            />
-          </label>
-        ))}
-       <button
-      onClick={handleClearData}
-      disabled={loadings}
-      className="px-6 py-3 rounded-lg bg-gray-500 text-white font-semibold hover:bg-gray-600 disabled:opacity-50"
-    >
-      {loadings ? "Deleting..." : "Clear All Data"}
-    </button>
-      </div>
+            {loadings ? "Deleting..." : "Clear All Data"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 };

@@ -1,17 +1,28 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronsUpDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '../components/ui/accordion';
-import CurrencyRupeeOutlinedIcon from '@mui/icons-material/CurrencyRupeeOutlined';
-import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
+  Barcode,
+  BookOpenText,
+  Boxes,
+  Check,
+  ChevronsUpDown,
+  Landmark,
+  Package,
+  Pencil,
+  Plus,
+  ReceiptIndianRupee,
+  ScrollText,
+  Settings,
+  ShoppingCart,
+  Trash2,
+  Undo2,
+  Upload,
+  Users,
+  Wallet,
+  X,
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
-import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,13 +46,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../components/ui/popover';
-import ManIcon from '@mui/icons-material/Man';
 import HsnMaster from '@/components/HsnMaster';
-import { set } from 'mongoose';
 
-
-
-
+const currency = (n) =>
+  `₹${Number(n || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 const Page = () => {
   const router = useRouter();
@@ -58,25 +69,24 @@ const Page = () => {
   const [deleteState, setDeleteState] = useState('');
   const [item, setItem] = useState([]);
   const [hsn, setHsn] = useState([]);
-  const[bank,setBank]=useState([]);
-  const [cash,setCash]=useState([]);
+  const [bank, setBank] = useState([]);
+  const [cash, setCash] = useState([]);
   const [alter, setAlter] = useState(false);
   const [del, setDel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedHsn, setSelectedHsn] = useState(null);
 
-
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [itemRes, custRes, invRes,hsnRes,voucherRes] = await Promise.all([
+        const [itemRes, custRes, invRes, hsnRes, voucherRes] = await Promise.all([
           fetch('/api/get-item'),
           fetch('/api/get-customer'),
           fetch('/api/get-invoice'),
           fetch('/api/get-hsn'),
           fetch('/api/get-voucher'),
         ]);
-        const [itemData, custData, invData,hsnData,voucherData] = await Promise.all([
+        const [itemData, custData, invData, hsnData, voucherData] = await Promise.all([
           itemRes.json(),
           custRes.json(),
           invRes.json(),
@@ -84,68 +94,63 @@ const Page = () => {
           voucherRes.json(),
         ]);
 
+        setCustomer(
+          custData.customer.map(cust => ({
+            id: cust._id,
+            name: cust.name || cust.customerName || cust._id
+          })) || []
+        );
 
-        // Transform data
-      setCustomer(
-  custData.customer.map(cust => ({
-    id: cust._id, // 🔥 Add the real MongoDB ID
-    name: cust.name || cust.customerName || cust._id
-  })) || []
-);
+        setItem(
+          itemData.item.map(it => ({
+            id: it._id,
+            name: it.name || it.itemName || it._id
+          })) || []
+        );
 
-setItem(
-  itemData.item.map(it => ({
-    id: it._id, // 🔥 Add the real MongoDB ID
-    name: it.name || it.itemName || it._id
-  })) || []
-);
-setHsn(
-  hsnData.hsn.map(hs => ({
-    ...hs,      
-    id: hs._id 
-  })) || []
-);
+        setHsn(
+          hsnData.hsn.map(hs => ({
+            ...hs,
+            id: hs._id
+          })) || []
+        );
 
-setBank(
-  voucherData.voucher.filter(v => v.paymentType === 'Bank').map(v => ({
-    id: v._id,
-    name: v.acName || v.accountName || v._id
-  })) || []
-);
-setCash(
-  voucherData.voucher.filter(v => v.paymentType === 'Cash').map(v => ({
-    id: v._id,
-    name: v.acName || v.accountName || v._id
-  })) || []
-);
+        setBank(
+          voucherData.voucher.filter(v => v.paymentType === 'Bank').map(v => ({
+            id: v._id,
+            name: v.acName || v.accountName || v._id
+          })) || []
+        );
 
-// console.log("Fetched Bank:", bank);
-console.log("Fetched Cash:", cash);
-
+        setCash(
+          voucherData.voucher.filter(v => v.paymentType === 'Cash').map(v => ({
+            id: v._id,
+            name: v.acName || v.accountName || v._id
+          })) || []
+        );
 
         // Categorize invoices
         const invoices = invData.invoice || [];
         const saleInv = invoices.filter(inv => inv.type === 'Sale' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
-            totalAmount: inv.totalAmount || 0,
-            customer:inv.customer.name
+          totalAmount: inv.totalAmount || 0,
+          customer: inv.customer.name
         }));
         const purchaseInv = invoices.filter(inv => inv.type === 'Purchase' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
-           customer:inv.customer.name
+          customer: inv.customer.name
         }));
         const saleRet = invoices.filter(inv => inv.type === 'Sale' && inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
-           customer:inv.customer.name
+          customer: inv.customer.name
         }));
         const purchaseRet = invoices.filter(inv => inv.type === 'Purchase' && inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
-           customer:inv.customer.name
+          customer: inv.customer.name
         }));
-         const totalSales = saleInv.reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) || 0), 0);
-setTotalSalesAmount(totalSales);
+        const totalSales = saleInv.reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) || 0), 0);
 
-
+        setTotalSalesAmount(totalSales);
         setSaleInvoices(saleInv);
         setPurchaseInvoices(purchaseInv);
         setSaleReturns(saleRet);
@@ -160,17 +165,12 @@ setTotalSalesAmount(totalSales);
     fetchData();
   }, []);
 
-
-
-console.log("Jaat",saleInvoices)
   const handleSelect = (currentValue) => {
-    console.log('handleSelect triggered with value:', currentValue);
     const newValue = currentValue;
     setValue(newValue);
     setOpen(false);
 
     if (newValue) {
-      console.log('Navigating with alterState:', alterState, 'value:', newValue);
       switch (alterState) {
         case 'Customer':
           router.push(`/customeradd?value=${newValue}`);
@@ -190,732 +190,316 @@ console.log("Jaat",saleInvoices)
         case 'Item':
           router.push(`/itemadd?value=${newValue}`);
           break;
-case 'HSN':
-      const selected = hsn.find(h => h.hsncode === newValue);
-      if (selected) {
-        setSelectedHsn(selected);  
-        setShowHsnMaster(true);           // ✅ Open popup in edit mode
-      }
-      break;
-
-      case'Bank':
-            router.push(`/voucheradd?type=Bank&value=${newValue}`);
+        case 'HSN': {
+          const selected = hsn.find(h => h.hsncode === newValue);
+          if (selected) {
+            setSelectedHsn(selected);
+            setShowHsnMaster(true);
+          }
           break;
-      case'Cash':
-            router.push(`/voucheradd?type=Cash&value=${newValue}`);
+        }
+        case 'Bank':
+          router.push(`/voucheradd?type=Bank&value=${newValue}`);
           break;
-
+        case 'Cash':
+          router.push(`/voucheradd?type=Cash&value=${newValue}`);
+          break;
         default:
           console.warn('Unsupported alterState:', alterState);
           alert(`Navigation not supported for ${alterState}`);
       }
-    } else {
-      console.log('No navigation: newValue is empty');
     }
   };
 
- const handleDelete = async (currentValue) => {
-  console.log('handleDelete triggered with value:', currentValue);
-
-  let endpoint = '';
-  switch (deleteState) {
-    case 'Customer':
-      endpoint = `/api/delete-cust?id=${currentValue}`;
-      break;
-    case 'Item':
-      endpoint = `/api/delete-item?id=${currentValue}`;
-      break;
-    case 'SaleInvoice':
-    case 'PurchaseInvoice':
-    case 'SaleReturn':
-    case 'PurchaseReturn':
-      endpoint = `/api/delete-invoice?id=${currentValue}`;
-      break;
-      case 'HSN':
-  endpoint = `/api/delete-hsn?id=${currentValue}`;
-  break;
-  case 'Bank':
-      endpoint = `/api/delete-voucher?id=${currentValue}&type=Bank`;
-      break;
-    case 'Cash':
-      endpoint = `/api/delete-voucher?id=${currentValue}&type=Cash`;
-      break;
-
-    default:
-      alert(`Delete not supported for ${alterState}`);
-      return;
-  }
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-    });
-
-    const result = await response.json();
-    if (result.success) {
-      console.log('✅ Deleted successfully');
-      window.location.reload();
-      // Optional: Reload or update UI
-    } else {
-      console.error('❌ Failed to delete:', result.error);
-      alert(`Failed to delete: ${result.error}`);
-    }
-  } catch (error) {
-    console.error('⚠️ Error during delete request:', error);
-    alert('Error during delete');
-  }
-};
-
-
-    const getEntities = () => {
-    switch (alterState) {
-      case 'Customer': return customer;
-      case 'SaleInvoice': return saleInvoices;
-      case 'PurchaseInvoice': return purchaseInvoices;
-      case 'SaleReturn': return saleReturns;
-      case 'PurchaseReturn': return purchaseReturns;
-      case 'Item': return item;
-      case 'HSN': return hsn; // or return hsn;
-      case 'Bank': return bank;
-      case 'Cash': return cash;
-      default: return [];
-    }
-  };
-
-  const getEntitiey = () => {
+  const handleDelete = async (currentValue) => {
+    let endpoint = '';
     switch (deleteState) {
+      case 'Customer':
+        endpoint = `/api/delete-cust?id=${currentValue}`;
+        break;
+      case 'Item':
+        endpoint = `/api/delete-item?id=${currentValue}`;
+        break;
+      case 'SaleInvoice':
+      case 'PurchaseInvoice':
+      case 'SaleReturn':
+      case 'PurchaseReturn':
+        endpoint = `/api/delete-invoice?id=${currentValue}`;
+        break;
+      case 'HSN':
+        endpoint = `/api/delete-hsn?id=${currentValue}`;
+        break;
+      case 'Bank':
+        endpoint = `/api/delete-voucher?id=${currentValue}&type=Bank`;
+        break;
+      case 'Cash':
+        endpoint = `/api/delete-voucher?id=${currentValue}&type=Cash`;
+        break;
+      default:
+        alert(`Delete not supported for ${deleteState}`);
+        return;
+    }
+
+    try {
+      const response = await fetch(endpoint, { method: 'POST' });
+      const result = await response.json();
+      if (result.success) {
+        window.location.reload();
+      } else {
+        console.error('Failed to delete:', result.error);
+        alert(`Failed to delete: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error during delete request:', error);
+      alert('Error during delete');
+    }
+  };
+
+  // One entry point per intent, so the two picker modes can never both be open
+  const startAlter = (section) => {
+    setValue('');
+    setDel(false);
+    setDeleteState('');
+    setAlterState(section);
+    setAlter(true);
+  };
+
+  const startDelete = (section) => {
+    setValue('');
+    setAlter(false);
+    setAlterState('');
+    setDeleteState(section);
+    setDel(true);
+  };
+
+  const closePicker = () => {
+    setValue('');
+    setOpen(false);
+    setAlter(false);
+    setDel(false);
+    setAlterState('');
+    setDeleteState('');
+  };
+
+  const entitiesFor = (sectionName) => {
+    switch (sectionName) {
       case 'Customer': return customer;
+      case 'Item': return item;
+      case 'HSN': return hsn;
+      case 'Bank': return bank;
+      case 'Cash': return cash;
       case 'SaleInvoice': return saleInvoices;
       case 'PurchaseInvoice': return purchaseInvoices;
       case 'SaleReturn': return saleReturns;
       case 'PurchaseReturn': return purchaseReturns;
-      case 'Item': return item;
-      case 'HSN': return hsn; // or return hsn;
-      case 'Bank': return bank;
-      case 'Cash': return cash;
       default: return [];
     }
   };
 
+  const isNamed = (sectionName) =>
+    sectionName === 'Customer' ||
+    sectionName === 'Item' ||
+    sectionName === 'Bank' ||
+    sectionName === 'Cash';
 
+  const renderAlterDeleteSection = (sectionName) => {
+    const isAlter = alter && alterState === sectionName;
+    const isDelete = del && deleteState === sectionName;
+    if (!isAlter && !isDelete) return null;
 
-const renderAlterDeleteSection = (sectionName) => {
-  const shouldRender =
-    (alter && alterState === sectionName) ||
-    (del && deleteState === sectionName);
+    const entities = entitiesFor(sectionName);
 
-  if (!shouldRender) return null;
+    const getDisplayValue = () => {
+      if (!value) return isAlter ? `Select ${sectionName} to edit` : `Select ${sectionName} to delete`;
 
-  let entities = [];
+      const selected = entities.find((e) => {
+        if (sectionName === 'HSN') return e.hsncode === value;
+        if (isNamed(sectionName)) return e.id === value || e.name === value;
+        return e.invoiceNo === value;
+      });
 
-  switch (sectionName) {
-    case "Customer":
-      entities = customer;
-      break;
+      if (!selected) return `Select ${sectionName}`;
+      if (sectionName === 'HSN') return selected.hsncode;
+      if (isNamed(sectionName)) return selected.name;
+      return selected.invoiceNo;
+    };
 
-    case "Item":
-      entities = item;
-      break;
-
-    case "HSN":
-      entities = hsn;
-      break;
-
-    case "Bank":
-      entities = bank;
-      break;
-
-    case "Cash":
-      entities = cash;
-      break;
-
-    case "SaleInvoice":
-      entities = saleInvoices;
-      break;
-
-    case "PurchaseInvoice":
-      entities = purchaseInvoices;
-      break;
-
-    case "SaleReturn":
-      entities = saleReturns;
-      break;
-
-    case "PurchaseReturn":
-      entities = purchaseReturns;
-      break;
-
-    default:
-      entities = [];
-  }
-
-  const getDisplayValue = () => {
-    if (!value) return `Select ${sectionName}`;
-
-    const selected = entities.find((e) => {
-      if (sectionName === "HSN") {
-        return e.hsncode === value;
-      }
-
-      if (
-        sectionName === "Customer" ||
-        sectionName === "Item" ||
-        sectionName === "Bank" ||
-        sectionName === "Cash"
-      ) {
-        return e.id === value || e.name === value;
-      }
-
-      return e.invoiceNo === value;
-    });
-
-    if (!selected) return `Select ${sectionName}`;
-
-    if (sectionName === "HSN") {
-      return selected.hsncode;
-    }
-
-    if (
-      sectionName === "Customer" ||
-      sectionName === "Item" ||
-      sectionName === "Bank" ||
-      sectionName === "Cash"
-    ) {
-      return selected.name;
-    }
-
-    return selected.invoiceNo;
-  };
-
-  return (
-    <div className="mt-4 flex justify-center">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className="w-[280px] justify-between"
-          >
-            {getDisplayValue()}
-            <ChevronsUpDown className="opacity-50" />
-          </Button>
-        </PopoverTrigger>
-
-        <PopoverContent className="w-[280px] p-0">
-          <Command>
-            <CommandInput
-              placeholder={`Search ${sectionName}`}
-              className="h-9"
-            />
-
-            <CommandList>
-              <CommandEmpty>No result found.</CommandEmpty>
-
-              <CommandGroup>
-                {entities.map((entity) => {
-                  let label = "";
-                  let alterValue = "";
-                  let deleteValue = "";
-
-                  // HSN
-                  if (sectionName === "HSN") {
-                    label = entity.hsncode;
-                    alterValue = entity.hsncode;
-                    deleteValue = entity.id;
-                  }
-
-                  // Customer / Item / Bank / Cash
-                  else if (
-                    sectionName === "Customer" ||
-                    sectionName === "Item" ||
-                    sectionName === "Bank" ||
-                    sectionName === "Cash"
-                  ) {
-                    label = entity.name;
-                    alterValue = entity.id;
-                    deleteValue = entity.id;
-                  }
-
-                  // Invoice sections
-                  else {
-                    label = entity.invoiceNo;
-                    alterValue = entity.invoiceNo;
-                    deleteValue = entity.invoiceNo;
-                  }
-
-                  return (
-                    <CommandItem
-                      key={deleteValue}
-                      value={label}
-                      onSelect={() => {
-                        setValue(
-                          alter ? alterValue : deleteValue
-                        );
-
-                        setOpen(false);
-
-                        if (alter) {
-                          handleSelect(alterValue);
-                        } else {
-                          handleDelete(deleteValue);
-                        }
-                      }}
-                    >
-                      {label}
-
-                      <Check
-                        className={cn(
-                          "ml-auto",
-                          value === alterValue ||
-                            value === deleteValue
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-};
-
-
-  return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="bg-blue-600 rounded-lg shadow-lg p-6 text-white mb-6">
-        <p className="text-lg font-semibold text-red-700 mb-2">Prashant Kumar</p>
-        <p className="text-sm uppercase tracking-wider opacity-80">Total Sales</p>
-       <h2 className="text-4xl font-extrabold mt-2">₹{totalSalesAmount.toFixed(2)}</h2>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col gap-4">
-        <h2 className="font-extrabold text-xl text-gray-800 mb-2">My Business</h2>
-
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-1">
-            <AccordionTrigger className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3">
-              <CurrencyRupeeOutlinedIcon /> Sale
-            </AccordionTrigger>
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                    Sale Invoice
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Sale Invoice</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => router.push('/saleadd')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to SaleInvoice');
-                        setDel(false);
-                        setAlterState('SaleInvoice');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                     onClick={() => {
-                      setAlter (false);
-                        setDeleteState('SaleInvoice');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-  {renderAlterDeleteSection("SaleInvoice")}
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                    Sale Return
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Sale Return</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => router.push('/salereturn')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to SaleReturn');
-                        setDel(false);
-                        setAlterState('SaleReturn');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => {
-                        console.log('Setting deleteState to SaleReturn');
-                        setAlter(false);
-                        setDeleteState('SaleReturn');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-              {renderAlterDeleteSection("SaleReturn")}
-          </AccordionItem>
-        </Accordion>
-
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-2">
-            <AccordionTrigger className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3">
-              <ShoppingCartOutlinedIcon /> Purchase
-            </AccordionTrigger>
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                    Purchase Invoice
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Purchase Invoice</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => router.push('/purchaseadd')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to PurchaseInvoice');
-                        setDel(false);
-                        setAlterState('PurchaseInvoice');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                     onClick={() => {
-                        console.log('Setting deleteState to PurchaseInvoice');
-                        setAlter(false);
-                        setDeleteState('PurchaseInvoice');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-    {renderAlterDeleteSection("PurchaseInvoice")}
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                    Purchase Return
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Purchase Return</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => router.push('/purchasereturn')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to PurchaseReturn');
-                        setAlterState('PurchaseReturn');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                            onClick={() => {
-                        setDeleteState('PurchaseReturn');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-                {renderAlterDeleteSection("PurchaseInvoice")}
-          </AccordionItem>
-        </Accordion>
-         {renderAlterDeleteSection("PurchaseReturn")}
-
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-3">
-            <AccordionTrigger className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3">
-              <ManIcon /> Master
-            </AccordionTrigger>
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                    Customer
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Customer</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => router.push('/customeradd')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to Customer');
-                      setDel(false);
-                        setAlterState('Customer');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                    onClick={() => {
-                        console.log('Setting deleteState to Customer');
-                        setAlter(false);
-                        setDeleteState('Customer');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-                {renderAlterDeleteSection("Customer")}
-
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                    Items
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Item</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => router.push('/itemadd')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to Item');
-                        setAlterState('Item');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                     onClick={() => {
-                        console.log('Setting deleteState to Item');
-                        setDeleteState('Item');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-             {renderAlterDeleteSection("Item")}
-
-<AccordionContent className="bg-white px-4 py-3">
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="outline" className="w-full font-extrabold text-2xl">
-        HSN
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent className="w-56">
-      <DropdownMenuLabel>HSN Master</DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => setShowHsnMaster(true)}>
-          Create
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setAlterState('HSN') || setAlter(true)}>
-          Alter
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setDeleteState('HSN') || setDel(true)}>
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuGroup>
-    </DropdownMenuContent>
-  </DropdownMenu>
-</AccordionContent>
-              {renderAlterDeleteSection("HSN")}
-
-
-
-
-          </AccordionItem>
-        </Accordion>
-
-             <Accordion type="single" collapsible>
-          <AccordionItem value="item-3">
-            <AccordionTrigger className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3">
-              <ManIcon /> Receive And Payments
-            </AccordionTrigger>
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                  Bank
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Bank</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                   <DropdownMenuItem onClick={() => router.push('/voucheradd?type=Bank')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to Bank');
-                        console.log("fetched bank:", bank);
-                        setDel(false);
-                        setAlterState('Bank');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                    onClick={() => {
-                        console.log('Setting deleteState to Bank');
-                        setAlter(false);
-                        setDeleteState('Bank');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-
-            <AccordionContent className="bg-white px-4 py-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full font-extrabold text-2xl">
-                    Cash
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  <DropdownMenuLabel>My Cash</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-      <DropdownMenuItem onClick={() => router.push('/voucheradd?type=Cash')}>
-                      Create
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        console.log('Setting alterState to Cash');
-                        setDel(false);
-                        setAlterState('Cash');
-                        setAlter(true);
-                      }}
-                    >
-                      Alter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                     onClick={() => {
-                        console.log('Setting deleteState to Cash');
-                        setAlter(false);
-                        setDeleteState('Cash');
-                        setDel(true);
-                      }}
-                    >Delete</DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-
-        <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/voucher')}>
-  🧾 Voucher
-</div>
-
-        <Accordion type="single" collapsible>
-<AccordionItem value="ledger" className="bg-gray-50 rounded-lg">
-  <AccordionTrigger className="px-4 py-3 text-lg font-semibold">
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 32 32" id="ledger"> <path fill="#212121" d="M12 8C11.4477 8 11 8.44772 11 9V11C11 11.5523 11.4477 12 12 12H20C20.5523 12 21 11.5523 21 11V9C21 8.44772 20.5523 8 20 8H12Z"></path> <path fill="#212121" d="M4 3C4 1.89543 4.89543 1 6 1H27C28.1046 1 29 1.89543 29 3V28C29 29.1046 28.1046 30 27 30H6C4.89543 30 4 29.1046 4 28V24.7391C3.09792 24.1616 2.5 23.1506 2.5 22C2.5 20.9218 3.02505 19.9662 3.83341 19.375C3.02505 18.7838 2.5 17.8282 2.5 16.75C2.5 15.6718 3.02505 14.7162 3.83341 14.125C3.02505 13.5338 2.5 12.5782 2.5 11.5C2.5 10.4218 3.02505 9.46622 3.83341 8.875C3.02505 8.28378 2.5 7.32821 2.5 6.25C2.5 5.0994 3.09792 4.08844 4 3.51091V3ZM6 20.2677V25H27V3L6 3V3.00947C6.22342 3.02647 6.44053 3.06606 6.64905 3.12595C6.85055 3.10147 7.19353 3.26251 7.55891 3.54953C8.36306 4.08926 8.91283 4.97865 8.99053 6H9C9 6.09849 8.9806 6.19602 8.94291 6.28701C8.90522 6.37801 8.84997 6.46069 8.78033 6.53033C8.71069 6.59997 8.62801 6.65522 8.53701 6.69291C8.44602 6.7306 8.34849 6.75 8.25 6.75C8.15151 6.75 8.05398 6.7306 7.96299 6.69291C7.87199 6.65522 7.78931 6.59997 7.71967 6.53033C7.65003 6.46069 7.59478 6.37801 7.55709 6.28701C7.5194 6.19602 7.5 6.09849 7.5 6H7.48228C7.37265 5.23358 6.76642 4.62735 6 4.51772V8.25947C6.22342 8.27647 6.44053 8.31606 6.64905 8.37595C6.85055 8.35147 7.19353 8.51251 7.55891 8.79953C8.36306 9.33926 8.91283 10.2286 8.99053 11.25H9C9 11.3485 8.9806 11.446 8.94291 11.537C8.90522 11.628 8.84997 11.7107 8.78033 11.7803C8.71069 11.85 8.62801 11.9052 8.53701 11.9429C8.44602 11.9806 8.34849 12 8.25 12C8.15151 12 8.05398 11.9806 7.96299 11.9429C7.87199 11.9052 7.78931 11.85 7.71967 11.7803C7.65003 11.7107 7.59478 11.628 7.55709 11.537C7.5194 11.446 7.5 11.3485 7.5 11.25H7.48228C7.37265 10.4836 6.76642 9.87735 6 9.76772V13.5095C6.22342 13.5265 6.44053 13.5661 6.64905 13.626C6.85055 13.6015 7.19353 13.7625 7.55891 14.0495C8.36306 14.5893 8.91283 15.4786 8.99053 16.5H9C9 16.5985 8.9806 16.696 8.94291 16.787C8.90522 16.878 8.84997 16.9607 8.78033 17.0303C8.71069 17.1 8.62801 17.1552 8.53701 17.1929C8.44602 17.2306 8.34849 17.25 8.25 17.25C8.15151 17.25 8.05398 17.2306 7.96299 17.1929C7.87199 17.1552 7.78931 17.1 7.71967 17.0303C7.65003 16.9607 7.59478 16.878 7.55709 16.787C7.5194 16.696 7.5 16.5985 7.5 16.5H7.48228C7.37265 15.7336 6.76642 15.1273 6 15.0177V18.7595C6.22342 18.7765 6.44053 18.8161 6.64905 18.876C6.85055 18.8515 7.19353 19.0125 7.55891 19.2995C8.36306 19.8393 8.91283 20.7286 8.99053 21.75H9C9 21.8485 8.9806 21.946 8.94291 22.037C8.90522 22.128 8.84997 22.2107 8.78033 22.2803C8.71069 22.35 8.62801 22.4052 8.53701 22.4429C8.44602 22.4806 8.34849 22.5 8.25 22.5C8.15151 22.5 8.05398 22.4806 7.96299 22.4429C7.87199 22.4052 7.78931 22.35 7.71967 22.2803C7.65003 22.2107 7.59478 22.128 7.55709 22.037C7.5194 21.946 7.5 21.8485 7.5 21.75H7.48228C7.37265 20.9836 6.76642 20.3774 6 20.2677ZM6 27L6 28H27V27H6Z"></path> </svg> Ledger
-  </AccordionTrigger>
-  <AccordionContent className="bg-white px-4 py-4">
-    <div className="flex justify-center">
-      {loading ? (
-        <p>Loading customers...</p>
-      ) : (
+    return (
+      <div
+        className={cn(
+          'mt-2 flex items-center gap-2 rounded-lg border p-2',
+          isDelete
+            ? 'border-destructive/30 bg-destructive/5'
+            : 'border-primary/30 bg-accent/60'
+        )}
+      >
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="w-[250px] justify-between"
+              className="h-9 flex-1 justify-between bg-card text-sm font-normal"
             >
-              {value
-                ? customer.find((c) => c.id === value)?.name
-                : "Select Customer"}
+              <span className="truncate">{getDisplayValue()}</span>
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </PopoverTrigger>
 
-          <PopoverContent className="w-[250px] p-0">
+          <PopoverContent className="w-[min(320px,calc(100vw-2rem))] p-0" align="start">
             <Command>
-              <CommandInput placeholder="Search Customer..." className="h-9" />
+              <CommandInput placeholder={`Search ${sectionName}...`} className="h-9" />
               <CommandList>
-                <CommandEmpty>No customers found.</CommandEmpty>
+                <CommandEmpty>No result found.</CommandEmpty>
                 <CommandGroup>
+                  {entities.map((entity) => {
+                    let label = '';
+                    let alterValue = '';
+                    let deleteValue = '';
+
+                    if (sectionName === 'HSN') {
+                      label = entity.hsncode;
+                      alterValue = entity.hsncode;
+                      deleteValue = entity.id;
+                    } else if (isNamed(sectionName)) {
+                      label = entity.name;
+                      alterValue = entity.id;
+                      deleteValue = entity.id;
+                    } else {
+                      label = entity.invoiceNo;
+                      alterValue = entity.invoiceNo;
+                      deleteValue = entity.invoiceNo;
+                    }
+
+                    return (
                       <CommandItem
-      key="all"
-      value="0"
-      onSelect={() => {
-        setValue("0");
-        setOpen(false);
-        router.push(`/ledger?customerId=0`);
-      }}
-    >
-      🧾 All Accounts
-      <Check
-        className={cn(
-          "ml-auto",
-          value === "0" ? "opacity-100" : "opacity-0"
-        )}
-      />
-    </CommandItem>
-                  {customer.map((cust) => (
+                        key={deleteValue}
+                        value={String(label)}
+                        onSelect={() => {
+                          setValue(isAlter ? alterValue : deleteValue);
+                          setOpen(false);
+
+                          if (isAlter) {
+                            handleSelect(alterValue);
+                          } else if (
+                            window.confirm(
+                              `Delete ${sectionName} "${label}"? This cannot be undone.`
+                            )
+                          ) {
+                            handleDelete(deleteValue);
+                          }
+                        }}
+                      >
+                        <span className="truncate">{label}</span>
+                        <Check
+                          className={cn(
+                            'ml-auto',
+                            value === alterValue || value === deleteValue
+                              ? 'opacity-100'
+                              : 'opacity-0'
+                          )}
+                        />
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+
+        <button
+          type="button"
+          onClick={closePicker}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          aria-label="Cancel"
+          title="Cancel"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  };
+
+  // A master/document row: name on the left, the three verbs behind one menu
+  const renderModuleRow = ({ section, label, icon: Icon, count, onCreate }) => (
+    <div>
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/30">
+        <span className="nav-tile-icon h-8 w-8">
+          <Icon className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{label}</p>
+          {typeof count === 'number' && (
+            <p className="text-xs text-muted-foreground">
+              {count} {count === 1 ? 'record' : 'records'}
+            </p>
+          )}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="shrink-0">
+              Manage
+              <ChevronsUpDown className="opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel>{label}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={onCreate}>
+                <Plus className="h-4 w-4" /> Create
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => startAlter(section)}>
+                <Pencil className="h-4 w-4" /> Alter
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => startDelete(section)}
+              >
+                <Trash2 className="h-4 w-4" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {renderAlterDeleteSection(section)}
+    </div>
+  );
+
+  // Ledger / stock-ledger report pickers
+  const renderReportPicker = ({ label, icon: Icon, options, emptyText, allLabel, onPick, busyText }) => (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+      <span className="nav-tile-icon h-8 w-8">
+        <Icon className="h-4 w-4" />
+      </span>
+      <p className="flex-1 text-sm font-medium text-foreground">{label}</p>
+
+      {loading ? (
+        <span className="text-xs text-muted-foreground">{busyText}</span>
+      ) : (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="w-[190px] justify-between font-normal">
+              <span className="truncate">Open report</span>
+              <ChevronsUpDown className="opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[min(280px,calc(100vw-2rem))] p-0" align="end">
+            <Command>
+              <CommandInput placeholder={`Search...`} className="h-9" />
+              <CommandList>
+                <CommandEmpty>{emptyText}</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem value="__all__" onSelect={() => onPick('0')}>
+                    {allLabel}
+                  </CommandItem>
+                  {options.map((opt) => (
                     <CommandItem
-                      key={cust.id}
-                      value={String(cust.id)}
-                      onSelect={() => {
-                        setValue(cust.id);
-                        setOpen(false);
-                        router.push(`/ledger?customerId=${cust.id}`);
-                      }}
+                      key={opt.id}
+                      value={String(opt.name)}
+                      onSelect={() => onPick(opt.id)}
                     >
-                      {cust.name}
-                      <Check
-                        className={cn(
-                          "ml-auto",
-                          value === cust.id ? "opacity-100" : "opacity-0"
-                        )}
-                      />
+                      <span className="truncate">{opt.name}</span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -925,268 +509,236 @@ const renderAlterDeleteSection = (sectionName) => {
         </Popover>
       )}
     </div>
-  </AccordionContent>
-</AccordionItem>
+  );
 
-        </Accordion>
+  const stats = [
+    { label: 'Sale invoices', value: saleInvoices.length },
+    { label: 'Purchases', value: purchaseInvoices.length },
+    { label: 'Customers', value: customer.length },
+    { label: 'Items', value: item.length },
+  ];
 
-    <Accordion type="single" collapsible>
-      <AccordionItem value="itemLedger" className="bg-gray-50 rounded-lg">
-        <AccordionTrigger className="px-4 py-3 text-lg font-semibold">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="32"
-            height="32"
-            fill="none"
-            viewBox="0 0 32 32"
-          >
-            <path
-              fill="#212121"
-              d="M12 8C11.4477 8 11 8.44772 11 9V11C11 11.5523 11.4477 12 12 12H20C20.5523 12 21 11.5523 21 11V9C21 8.44772 20.5523 8 20 8H12Z"
-            ></path>
-            <path
-              fill="#212121"
-              d="M4 3C4 1.89543 4.89543 1 6 1H27C28.1046 1 29 1.89543 29 3V28C29 29.1046 28.1046 30 27 30H6C4.89543 30 4 29.1046 4 28V24.7391C3.09792 24.1616 2.5 23.1506 2.5 22C2.5 20.9218 3.02505 19.9662 3.83341 19.375C3.02505 18.7838 2.5 17.8282 2.5 16.75C2.5 15.6718 3.02505 14.7162 3.83341 14.125C3.02505 13.5338 2.5 12.5782 2.5 11.5C2.5 10.4218 3.02505 9.46622 3.83341 8.875C3.02505 8.28378 2.5 7.32821 2.5 6.25C2.5 5.0994 3.09792 4.08844 4 3.51091V3Z"
-            ></path>
-          </svg>
-          Item Ledger
-        </AccordionTrigger>
-
-        <AccordionContent className="bg-white px-4 py-4">
-          <div className="flex justify-center">
-            {loading ? (
-              <p>Loading items...</p>
-            ) : (
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[250px] justify-between">
-                    {value
-                      ? item.find((item) => item.id === value)?.name
-                      : "Select Item"}
-                    <ChevronsUpDown className="opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-
-                <PopoverContent className="w-[250px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search Item Ledger..." className="h-9" />
-                    <CommandList>
-                      <CommandEmpty>No items found.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          key="all"
-                          value="0"
-                          onSelect={() => {
-                            setValue("0");
-                            setOpen(false);
-                            router.push(`/item-ledger?itemId=0`);
-                          }}
-                        >
-                          📦 All Items
-                          <Check
-                            className={cn(
-                              "ml-auto",
-                              value === "0" ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                        </CommandItem>
-
-                        {item.map((item) => (
-                          <CommandItem
-                            key={item.id}
-                            value={String(item.id)}
-                            onSelect={() => {
-                              setValue(item.id);
-                              setOpen(false);
-                              router.push(`/item-ledger?itemId=${item.id}`);
-                            }}
-                          >
-                            {item.name}
-                            <Check
-                              className={cn(
-                                "ml-auto",
-                                value === item.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )}
+  return (
+    <div className="page-shell space-y-6">
+      {/* Headline figure */}
+      <section className="overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-6 p-6 sm:p-7">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-primary-foreground/70">
+              Total sales
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tabular-nums sm:text-4xl">
+              {loading ? '—' : currency(totalSalesAmount)}
+            </h1>
+            <p className="mt-2 text-sm text-primary-foreground/80">
+              Across {saleInvoices.length} sale {saleInvoices.length === 1 ? 'invoice' : 'invoices'}
+            </p>
           </div>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
 
-        
-
-        <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/setup')}>
-<SettingsApplicationsIcon/>  Setup
-</div>
-        <div className="bg-gray-50 hover:bg-gray-100 font-bold text-lg rounded-xl px-4 py-3 flex items-center cursor-pointer w-full" onClick={()=>router.push('/upload')}>
-<SettingsApplicationsIcon/>  Upload
-</div>
-
-
-
-      {/* Alter Section */}
-      {/* {alter && (
-        <div className="mt-6 flex justify-center">
-          {loading ? (
-            <p>Loading data...</p>
-          ) : (
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[250px] justify-between">
-                  {value
-                    ? getEntities().find((e) =>
-                        (alterState === 'Customer' || alterState === 'Item'
-                          ? e.name
-                          : e.invoiceNo) === value
-                      )?.[alterState === 'Customer' || alterState === 'Item' ? 'name' : 'invoiceNo']
-                    : `Select ${alterState}`}
-                  <ChevronsUpDown className="opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[250px] p-0">
-                <Command>
-                  <CommandInput placeholder={`Search ${alterState}`} className="h-9" />
-                  <CommandList>
-                    <CommandEmpty>No result found.</CommandEmpty>
-                    <CommandGroup>
-                      {getEntities().map((entity) => {
-                        const key = alterState === 'Customer' || alterState === 'Item' ? entity.name :  alterState === 'HSN' ? entity.hsncode: alterState === 'Bank' || alterState=='Cash'?entity.id: entity.invoiceNo;
-                       const values =
-  alterState === 'Customer' || alterState === 'Item'
-    ? entity.name
-    : alterState === 'HSN'
-    ? entity.hsncode
-    : alterState === 'SaleInvoice' || alterState === 'PurchaseInvoice'||alterState === 'SaleReturn' || alterState === 'PurchaseReturn'  
-    ? entity.invoiceNo
-    : alterState === 'Bank' || alterState === 'Cash'
-    ? entity.name || entity.id
-    : entity.invoiceNo;
-
-                        return (
-                          <CommandItem
-                            key={key}
-                            value={String(key)}
-                            onSelect={(currentValue) => handleSelect(currentValue)}
-                          >
-                            {values}
-                            <Check className={cn('ml-auto', value === key ? 'opacity-100' : 'opacity-0')} />
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => router.push('/saleadd')}
+              className="btn btn-sm bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+            >
+              <Plus className="h-4 w-4" /> New sale
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/purchaseadd')}
+              className="btn btn-sm border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+            >
+              <Plus className="h-4 w-4" /> New purchase
+            </button>
+          </div>
         </div>
-      )} */}
+      </section>
 
+      {/* At-a-glance counts */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="stat-card">
+            <p className="stat-label">{s.label}</p>
+            <p className="stat-value">{loading ? '—' : s.value}</p>
+          </div>
+        ))}
+      </section>
 
-      {/* Delete Section */}
-      {/* {del && (
-        <div className="mt-6 flex justify-center">
-          {loading ? (
-            <p>Loading data...</p>
-          ) : (
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-             <Button variant="outline" className="w-[250px] justify-between">
-  {value
-    ? getEntitiey().find((e) =>
-        deleteState === 'Customer' || deleteState === 'Item'
-          ? e.name === value
-          : deleteState === 'HSN'
-          ? e.hsncode === value
-          : deleteState === 'Bank' || deleteState === 'Cash'
-          ? e.acName === value
-          : e.invoiceNo === value
-      )?.[
-        deleteState === 'Customer' || deleteState === 'Item'
-          ? 'name'
-          : deleteState === 'HSN'
-          ? 'hsncode'
-          : deleteState === 'Bank' || deleteState === 'Cash'
-          ? 'acName'
-          : 'invoiceNo'
-      ]
-    : `Select ${deleteState}`}
-  <ChevronsUpDown className="opacity-50" />
-</Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[250px] p-0">
-                <Command>
-                  <CommandInput placeholder={`Search ${deleteState}`} className="h-9" />
-                  <CommandList>
-                    <CommandEmpty>No result found.</CommandEmpty>
-                   <CommandGroup>
-  {getEntitiey().map((entity) => {
-   let keys, id;
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Sales */}
+        <section className="panel">
+          <div className="panel-head">
+            <h2 className="panel-title">Sales</h2>
+            <span className="chip">
+              <ReceiptIndianRupee className="h-3.5 w-3.5" />
+              {saleInvoices.length + saleReturns.length}
+            </span>
+          </div>
+          <div className="panel-body space-y-3">
+            {renderModuleRow({
+              section: "SaleInvoice",
+              label: "Sale Invoice",
+              icon: ReceiptIndianRupee,
+              count: saleInvoices.length,
+              onCreate: () => router.push('/saleadd'),
+            })}
+            {renderModuleRow({
+              section: "SaleReturn",
+              label: "Sale Return",
+              icon: Undo2,
+              count: saleReturns.length,
+              onCreate: () => router.push('/salereturn'),
+            })}
+          </div>
+        </section>
 
-if (
-  deleteState === 'Customer' ||
-  deleteState === 'Item'
-) {
-  keys = entity.name;
-  id = entity.id;
-} else if (deleteState === 'HSN') {
-  keys = entity.hsncode;
-  id = entity.id;
-}else if (
-  deleteState === 'Bank' ||
-  deleteState === 'Cash'
-) {
-  keys = entity.name;
-  id = entity.id;
-}
+        {/* Purchases */}
+        <section className="panel">
+          <div className="panel-head">
+            <h2 className="panel-title">Purchases</h2>
+            <span className="chip">
+              <ShoppingCart className="h-3.5 w-3.5" />
+              {purchaseInvoices.length + purchaseReturns.length}
+            </span>
+          </div>
+          <div className="panel-body space-y-3">
+            {renderModuleRow({
+              section: "PurchaseInvoice",
+              label: "Purchase Invoice",
+              icon: ShoppingCart,
+              count: purchaseInvoices.length,
+              onCreate: () => router.push('/purchaseadd'),
+            })}
+            {renderModuleRow({
+              section: "PurchaseReturn",
+              label: "Purchase Return",
+              icon: Undo2,
+              count: purchaseReturns.length,
+              onCreate: () => router.push('/purchasereturn'),
+            })}
+          </div>
+        </section>
 
-else {
-  keys = entity.invoiceNo;
-  id = entity.invoiceNo;
-}
+        {/* Masters */}
+        <section className="panel">
+          <div className="panel-head">
+            <h2 className="panel-title">Masters</h2>
+          </div>
+          <div className="panel-body space-y-3">
+            {renderModuleRow({
+              section: "Customer",
+              label: "Customers",
+              icon: Users,
+              count: customer.length,
+              onCreate: () => router.push('/customeradd'),
+            })}
+            {renderModuleRow({
+              section: "Item",
+              label: "Items",
+              icon: Package,
+              count: item.length,
+              onCreate: () => router.push('/itemadd'),
+            })}
+            {renderModuleRow({
+              section: "HSN",
+              label: "HSN Codes",
+              icon: Barcode,
+              count: hsn.length,
+              onCreate: () => {
+              setSelectedHsn(null);
+              setShowHsnMaster(true);
+              },
+            })}
+          </div>
+        </section>
 
+        {/* Receipts & payments */}
+        <section className="panel">
+          <div className="panel-head">
+            <h2 className="panel-title">Receipts &amp; Payments</h2>
+          </div>
+          <div className="panel-body space-y-3">
+            {renderModuleRow({
+              section: "Bank",
+              label: "Bank",
+              icon: Landmark,
+              count: bank.length,
+              onCreate: () => router.push('/voucheradd?type=Bank'),
+            })}
+            {renderModuleRow({
+              section: "Cash",
+              label: "Cash",
+              icon: Wallet,
+              count: cash.length,
+              onCreate: () => router.push('/voucheradd?type=Cash'),
+            })}
+          </div>
+        </section>
 
-    return (
-      <CommandItem
-        key={id}
-        value={String(id)}
-        onSelect={() => handleDelete(id)}
-      >
-        {keys}
-        <Check className={cn('ml-auto', value === keys ? 'opacity-100' : 'opacity-0')} />
-      </CommandItem>
-    );
-  })}
-</CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-      )} */}
+        {/* Reports */}
+        <section className="panel lg:col-span-2">
+          <div className="panel-head">
+            <h2 className="panel-title">Reports</h2>
+          </div>
+          <div className="panel-body grid gap-3 md:grid-cols-2">
+            {renderReportPicker({
+              label: "Customer Ledger",
+              icon: BookOpenText,
+              options: customer,
+              allLabel: "🧾 All Accounts",
+              emptyText: "No customers found.",
+              busyText: "Loading customers...",
+              onPick: (id) => router.push(`/ledger?customerId=${id}`),
+            })}
+            {renderReportPicker({
+              label: "Stock Ledger",
+              icon: Boxes,
+              options: item,
+              allLabel: "📦 All Items",
+              emptyText: "No items found.",
+              busyText: "Loading items...",
+              onPick: (id) => router.push(`/item-ledger?itemId=${id}`),
+            })}
+
+            <button type="button" className="nav-tile" onClick={() => router.push('/voucher')}>
+              <span className="nav-tile-icon">
+                <ScrollText className="h-[18px] w-[18px]" />
+              </span>
+              <span className="flex-1">Voucher Register</span>
+            </button>
+
+            <button type="button" className="nav-tile" onClick={() => router.push('/upload')}>
+              <span className="nav-tile-icon">
+                <Upload className="h-[18px] w-[18px]" />
+              </span>
+              <span className="flex-1">
+                Upload Invoice
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Scan a bill and import it
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
       </div>
-                 {showHsnMaster && (
-  <HsnMaster
-    open={showHsnMaster}
-    onClose={() => {
-      setShowHsnMaster(false);
-      setSelectedHsn(null); // reset
-    }}
-    selected={selectedHsn} // ✅ pass selected data
-  />
-)}
 
+      <div className="flex justify-end">
+        <button type="button" className="btn btn-secondary" onClick={() => router.push('/setup')}>
+          <Settings className="h-4 w-4" /> Setup
+        </button>
+      </div>
+
+      {showHsnMaster && (
+        <HsnMaster
+          open={showHsnMaster}
+          onClose={() => {
+            setShowHsnMaster(false);
+            setSelectedHsn(null);
+          }}
+          selected={selectedHsn}
+        />
+      )}
     </div>
-
   );
 };
 

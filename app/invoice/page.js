@@ -138,7 +138,7 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
     <>
 <div 
   ref={contentRef} 
-  className={`mx-auto bg-white border border-gray-300 rounded-md shadow-sm text-gray-900 font-sans transition-all duration-300
+  className={`mx-auto my-6 bg-white border border-gray-300 rounded-xl shadow-sm text-gray-900 font-sans transition-all duration-300
     ${isRollStationary ? 'max-w-[480px] p-3 text-[12px]' : 'max-w-3xl p-8 text-[14px]'}`}
   style={{
     fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
@@ -315,6 +315,7 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
             <th className="py-2 px-4 text-left border-b border-gray-300">HSN Code</th>
             <th className="py-2 px-4 text-right border-b border-gray-300">GST Rate (%)</th>
             <th className="py-2 px-4 text-right border-b border-gray-300">Taxable Amount (₹)</th>
+            <th className="py-2 px-4 text-right border-b border-gray-300">GST Amount (₹)</th>
             <th className="py-2 px-4 text-right border-b border-gray-300">Total Amount (₹)</th>
           </tr>
         </thead>
@@ -323,6 +324,9 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
             <tr key={hsn} className="border-b border-gray-200 hover:bg-gray-50">
               <td className="py-2 px-4">{hsn}</td>
               <td className="py-2 px-4 text-right">{data.gstRate?.toFixed?.(2) || 0}%</td>
+              <td className="py-2 px-4 text-right">
+                ₹{(Number(data.total || 0) - Number(data.gstAmount || 0)).toFixed(2)}
+              </td>
               <td className="py-2 px-4 text-right">₹{Number(data.gstAmount || 0).toFixed(2)}</td>
               <td className="py-2 px-4 text-right font-medium">₹{Number(data.total || 0).toFixed(2)}</td>
             </tr>
@@ -331,6 +335,11 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
         <tfoot className="bg-gray-50 font-semibold">
           <tr>
             <td className="py-2 px-4 text-right" colSpan={2}>Grand Total</td>
+            <td className="py-2 px-4 text-right">
+              ₹{Object.values(hsnTotals)
+                .reduce((sum, d) => sum + ((d.total || 0) - (d.gstAmount || 0)), 0)
+                .toFixed(2)}
+            </td>
             <td className="py-2 px-4 text-right">
               ₹{Object.values(hsnTotals).reduce((sum, d) => sum + (d.gstAmount || 0), 0).toFixed(2)}
             </td>
@@ -385,12 +394,11 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
       </div>
 
       {/* Button */}
-      <div className='w-full bg-white flex items-center justify-center mt-6'>
-        <button
-          onClick={downloadPDF}
-          className='w-[28vw] sm:w-[12vw] h-[8vh] sm:h-[6vh] bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-md transition-colors'
-          type="button"
-        >
+      <div className='no-print sticky bottom-0 mt-6 flex items-center justify-center gap-3 border-t border-border bg-card/90 px-4 py-4 backdrop-blur'>
+        <button onClick={() => window.print()} className='btn btn-secondary' type="button">
+          Print
+        </button>
+        <button onClick={downloadPDF} className='btn btn-primary' type="button">
           Download Invoice
         </button>
       </div>
@@ -400,7 +408,7 @@ const totalGstAmount = items.reduce((sum, item) => sum + ((item.taxableAmount ||
 
 const page = () => {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="page-shell text-sm text-muted-foreground">Loading...</div>}>
       <PageContent />
     </Suspense>
   );

@@ -39,9 +39,12 @@ export async function GET(req) {
         { status: 404 }
       );
 
-    const ledgers = await Ledger.find({
-      $or: [{ customerName: customer.name }, { account: customer.name }],
-    })
+    // `customerName` is whose ledger a row belongs to; `account` is the contra
+    // side of that same row. Matching on both meant a cash or bank account
+    // pulled in its own aggregate row PLUS every party row naming it as the
+    // contra — the same money twice, the second time from the other side's
+    // point of view. Every account already gets rows of its own.
+    const ledgers = await Ledger.find({ customerName: customer.name })
       .sort({ date: 1 })
       .lean();
 

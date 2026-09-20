@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { connect } from "../../../lib/mongodb";
 import Voucher from "../../../models/voucherModel";
 import Ledger from "../../../models/ledgerModel";
 import Customer from "../../../models/custModel";
+import { balancePipeline } from "@/lib/balance.mjs";
+import { buildVoucherBalanceDeltas } from "@/lib/voucherLedger.mjs";
+import { recomputeLedgerBalances } from "@/lib/runningBalances.mjs";
+import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
 
 export async function POST(req) {
   try {
-    await connect();
-
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
 
@@ -15,48 +16,43 @@ export async function POST(req) {
       return NextResponse.json({ error: "Voucher ID missing" }, { status: 400 });
     }
 
+    // Balance rollback, ledger cleanup and the delete itself are one unit.
+    const deletedVoucher = await withTransaction(async (session) => {
     // 1️⃣ Fetch voucher before deletion
-    const voucher = await Voucher.findById(id);
+    const voucher = await Voucher.findById(id).session(session);
     if (!voucher) {
-      return NextResponse.json({ error: "Voucher not found" }, { status: 404 });
+      throw new AbortTransaction({ error: "Voucher not found" }, 404);
     }
 
-    const { acName, customers } = voucher;
+    const { customers } = voucher;
 
-    // 2️⃣ Rollback balances (reverse what was done originally)
-    for (const entry of customers) {
-      const { name, debit = 0, credit = 0 } = entry;
-      const amount = debit || credit;
+    // 2️⃣ Rollback balances — the exact inverse of what voucher-add applied.
+    //
+    // Derived from the same builder voucher-add applies, so it covers the
+    // account the money moved through as well as the parties.
+    const deltas = buildVoucherBalanceDeltas({
+      acName: voucher.acName,
+      customers: customers || [],
+    });
 
-      // Reverse balance change
-      if (debit > 0) {
-        // Originally customer was debited → reduce that now
-        await Customer.findOneAndUpdate(
-          { name },
-          { $inc: { lastBal: -amount } }
-        );
-        await Customer.findOneAndUpdate(
-          { name: acName },
-          { $inc: { lastBal: +amount } }
-        );
-      } else if (credit > 0) {
-        // Originally customer was credited → reverse that now
-        await Customer.findOneAndUpdate(
-          { name },
-          { $inc: { lastBal: +amount } }
-        );
-        await Customer.findOneAndUpdate(
-          { name: acName },
-          { $inc: { lastBal: -amount } }
-        );
-      }
+    for (const { name, delta } of deltas) {
+      await Customer.findOneAndUpdate(
+        { name },
+        balancePipeline(-delta),
+        { session }
+      );
     }
 
     // 3️⃣ Delete related ledger entries
-    await Ledger.deleteMany({ voucherId: id });
+    await Ledger.deleteMany({ voucherId: id }, { session });
 
     // 4️⃣ Delete voucher itself
-    const deletedVoucher = await Voucher.findByIdAndDelete(id);
+      const removed = await Voucher.findByIdAndDelete(id, { session });
+
+      await recomputeLedgerBalances(deltas.map((d) => d.name), session);
+
+      return removed;
+    });
 
     return NextResponse.json({
       success: true,
@@ -65,6 +61,9 @@ export async function POST(req) {
     });
 
   } catch (error) {
+    if (error instanceof AbortTransaction) {
+      return NextResponse.json(error.payload, { status: error.status });
+    }
     console.error("Delete Voucher Error:", error);
     return NextResponse.json(
       { success: false, error: error.message },

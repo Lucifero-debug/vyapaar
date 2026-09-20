@@ -57,16 +57,16 @@ const HsnMaster = ({ open, onClose, selected }) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl p-6 bg-white border border-gray-200 shadow-xl rounded-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-gray-800 mb-4">
+          <DialogTitle className="text-lg font-semibold text-foreground">
             {isEditing ? 'Edit HSN Code' : 'Add New HSN'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">HSN Code</label>
+        <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2">
+          <div className="field">
+            <label className="field-label mb-1.5 block">HSN Code</label>
             <Input
               type="number"
               placeholder="Enter HSN Code"
@@ -76,8 +76,8 @@ const HsnMaster = ({ open, onClose, selected }) => {
               }
             />
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">HSN Name</label>
+          <div className="field">
+            <label className="field-label mb-1.5 block">HSN Name</label>
             <Input
               placeholder="Enter Group"
               value={hsnForm.hsnname}
@@ -86,8 +86,8 @@ const HsnMaster = ({ open, onClose, selected }) => {
               }
             />
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">GST (%)</label>
+          <div className="field">
+            <label className="field-label mb-1.5 block">GST (%)</label>
             <Input
               placeholder="Enter GST %"
               type="number"
@@ -97,8 +97,8 @@ const HsnMaster = ({ open, onClose, selected }) => {
               }
             />
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">GST Unit</label>
+          <div className="field">
+            <label className="field-label mb-1.5 block">GST Unit</label>
             <Input
               placeholder="Enter Gst Unit"
               value={hsnForm.gstunit}
@@ -111,7 +111,7 @@ const HsnMaster = ({ open, onClose, selected }) => {
 
         <Button
           onClick={handleSaveHsn}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          className="w-full"
         >
           {isEditing ? 'Update HSN' : 'Save HSN'}
         </Button>

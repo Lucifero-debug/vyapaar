@@ -129,68 +129,40 @@ const PageContent = () => {
   };
 
   return (
-    <div className="w-full flex justify-center items-start py-6">
-      <Tabs defaultValue="account" className="flex flex-col md:flex-row w-[95vw] md:w-[80vw]">
+    <div className="page-shell">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Item</h1>
+          <p className="page-subtitle">Item details, HSN and stock.</p>
+        </div>
+      </header>
+      <Tabs defaultValue="account" className="panel flex w-full flex-col overflow-hidden md:flex-row">
         {/* LEFT SIDE (Tabs List) */}
-        <TabsList
-          className="
-            flex 
-            md:flex-col 
-            justify-start 
-            md:w-[200px] 
-            w-full 
-            overflow-x-auto 
-            h-28
-            border-b md:border-b-0 md:border-r 
-            border-gray-300 
-            rounded-none 
-            bg-white
-          "
-        >
+        <TabsList className="flex h-auto w-full shrink-0 flex-row gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-2 md:w-[210px] md:flex-col md:border-b-0 md:border-r">
           <TabsTrigger
             value="account"
-            className="
-              flex-1 
-              md:w-full 
-              justify-center md:justify-start 
-              px-4 py-3 
-              text-sm 
-              whitespace-nowrap
-              rounded-none 
-              data-[state=active]:bg-blue-100 
-              data-[state=active]:text-blue-600
-            "
-          >
+        className="flex-1 justify-center whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none md:w-full md:flex-none md:justify-start"
+      >
             Standard
           </TabsTrigger>
           <TabsTrigger
             value="password"
-            className="
-              flex-1 
-              md:w-full 
-              justify-center md:justify-start 
-              px-4 py-3 
-              text-sm 
-              whitespace-nowrap
-              rounded-none 
-              data-[state=active]:bg-blue-100 
-              data-[state=active]:text-blue-600
-            "
-          >
+        className="flex-1 justify-center whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none md:w-full md:flex-none md:justify-start"
+      >
             Advance
           </TabsTrigger>
         </TabsList>
 
         {/* RIGHT SIDE (Tab Content) */}
-        <div className="flex-1 p-3 md:p-5 overflow-auto">
+        <div className="flex-1 overflow-auto p-4 md:p-6">
           {/* Standard */}
           <TabsContent value="account" className="h-full">
-            <Card className="border-2 border-gray-200">
-              <CardHeader>
+            <Card className="border-0 shadow-none">
+              <CardHeader className="px-0 pt-0">
                 <CardTitle>Standard</CardTitle>
                 <CardDescription>Basic details of the item.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4 px-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <InputField label="Name" value={name} onChange={setName} />
                   <InputField label="Short Name" value={short} onChange={setShort} />
@@ -200,7 +172,7 @@ const PageContent = () => {
                     <Label htmlFor="hsn">HSN Code</Label>
                     <select
                       id="hsn"
-                      className="w-full border border-gray-300 rounded px-2 py-2"
+                      className="field-select"
                       value={hsn}
                       onChange={(e) => {
                         const selectedHsn = hsnList.find(h => h.hsncode === e.target.value);
@@ -224,7 +196,7 @@ const PageContent = () => {
                   <InputField label="GST%" type="number" value={gst} readOnly />
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end">
+              <CardFooter className="justify-end px-0 pb-0">
                 <Button onClick={handleSave}>Save</Button>
               </CardFooter>
             </Card>
@@ -232,12 +204,12 @@ const PageContent = () => {
 
           {/* Advance */}
           <TabsContent value="password" className="h-full">
-            <Card className="border-2 border-gray-200">
-              <CardHeader>
+            <Card className="border-0 shadow-none">
+              <CardHeader className="px-0 pt-0">
                 <CardTitle>Advance</CardTitle>
                 <CardDescription>Financial details of the item.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4 px-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>Opening Stock</Label>
@@ -250,7 +222,7 @@ const PageContent = () => {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end">
+              <CardFooter className="justify-end px-0 pb-0">
                 <Button onClick={handleSave}>Save</Button>
               </CardFooter>
             </Card>
@@ -275,7 +247,7 @@ const InputField = ({ label, value, onChange, type = "text", readOnly = false })
 );
 
 const page = () => (
-  <Suspense fallback={<div>Loading...</div>}>
+  <Suspense fallback={<div className="page-shell text-sm text-muted-foreground">Loading...</div>}>
     <PageContent />
   </Suspense>
 );

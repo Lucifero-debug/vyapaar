@@ -1,19 +1,39 @@
 import { NextResponse } from "next/server";
-import {connect} from '../../../lib/mongodb'
 import Item from "../../../models/itemModel";
-
+import ItemLedger from "../../../models/itemLedgerModel";
+import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
 
 export async function POST(req) {
     try {
-        await connect()
-        const itemData = await req.json();    
+        const itemData = await req.json();
         const itemId = itemData.id;
-       console.log("zinda",itemId)
-        // Update the existing item based on the ID
-        const updatedItem = await Item.findOneAndUpdate(
-            { _id: itemId }, // Filter to find the document to update
-            {
-                name: itemData.name,
+
+        // The rename cascade commits with the item itself, so stock history
+        // cannot end up split across two names.
+        const updatedItem = await withTransaction(async (session) => {
+            const existing = await Item.findById(itemId).session(session);
+            if (!existing) {
+                throw new AbortTransaction({ error: "Item not found." }, 404);
+            }
+
+            const previousName = existing.name;
+            const nextName = (itemData.name || "").trim() || previousName;
+            const renamed = nextName !== previousName;
+
+            if (renamed) {
+                const clash = await Item.findOne({ name: nextName })
+                    .session(session)
+                    .lean();
+                if (clash) {
+                    throw new AbortTransaction(
+                        { error: `An item named "${nextName}" already exists.` },
+                        409
+                    );
+                }
+            }
+
+            existing.set({
+                name: nextName,
                 hsn: itemData.hsn,
                 mrp: itemData.mrp,
                 unit: itemData.unit,
@@ -21,25 +41,40 @@ export async function POST(req) {
                 salePrice: itemData.salePrice,
                 weight: itemData.weight,
                 itemType: itemData.itemType,
-                purchasePrice: itemData.purchasePrice,  
+                purchasePrice: itemData.purchasePrice,
                 gst: itemData.gst,
                 discount: itemData.discount,
                 group: itemData.group,
-                    short:itemData.short,
-                                openingQuantity:itemData.openBal,
-            lastQuantity:itemData.lastBal,
-            },
-            { new: true } // Return the updated document
-        ).catch(err => {
-            console.error("Update Error:", err);
-            throw err;
+                short: itemData.short,
+                openingQuantity: itemData.openBal,
+                lastQuantity: itemData.lastBal,
+            });
+
+            await existing.save({ session });
+
+            // Stock rows identify an item by NAME, so a rename used to strand
+            // every movement the item had ever had.
+            if (renamed) {
+                await ItemLedger.updateMany(
+                    { itemName: previousName },
+                    { $set: { itemName: nextName } },
+                    { session }
+                );
+            }
+
+            return existing;
         });
 
-        console.log('Updated Item:', updatedItem);
-        return NextResponse.json({ message: "Item updated successfully", success: true, updatedItem });
+        return NextResponse.json({
+            message: "Item updated successfully",
+            success: true,
+            updatedItem,
+        });
     } catch (error) {
-        return NextResponse.json({error:error.message},{status:500})
+        if (error instanceof AbortTransaction) {
+            return NextResponse.json(error.payload, { status: error.status });
+        }
+        console.error("Update Error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
-      // Handle saving itemData to your database
-  }
-  
+}

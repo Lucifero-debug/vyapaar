@@ -10,7 +10,14 @@
     "start": "next start",
     "lint": "next lint",
     "email": "email dev",
-    "export": "next export"
+    "export": "next export",
+    "migrate:balances": "node scripts/migrate-balances.mjs",
+    "migrate:balances:apply": "node scripts/migrate-balances.mjs --apply",
+    "test": "node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs",
+    "rebuild:voucher-ledger": "node scripts/rebuild-voucher-ledger.mjs",
+    "rebuild:voucher-ledger:apply": "node scripts/rebuild-voucher-ledger.mjs --apply",
+    "reset:data": "node scripts/reset-data.mjs",
+    "reset:data:apply": "node scripts/reset-data.mjs --apply"
   },
   "dependencies": {
     "@capacitor/cli": "^7.4.4",

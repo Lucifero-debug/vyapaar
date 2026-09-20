@@ -118,36 +118,45 @@ const handleUpload = async () => {
 };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+    <main className="page-shell flex max-w-lg flex-col justify-center">
+      <section className="panel">
+        <div className="panel-head">
+          <h1 className="panel-title">Invoice AI Analyzer</h1>
+        </div>
 
-      <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
+        <div className="panel-body space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Upload a photo of a purchase bill and it will be read and saved for you.
+          </p>
 
-        <h1 className="text-2xl font-bold mb-6 text-center">
-          Invoice AI Analyzer
-        </h1>
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-muted/40 px-6 py-8 text-center transition-colors hover:border-primary/50 hover:bg-accent/40">
+            <span className="text-sm font-medium text-foreground">
+              {file ? file.name : "Choose an image"}
+            </span>
+            <span className="text-xs text-muted-foreground">PNG or JPG of the bill</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e)=>setFile(e.target?.files?.[0] || null)}
+              className="sr-only"
+            />
+          </label>
 
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e)=>setFile(e.target?.files?.[0] || null)}
-          className="mb-4 w-full"
-        />
+          <button
+            onClick={handleUpload}
+            disabled={!file || loading}
+            className="btn btn-primary w-full"
+          >
+            {loading ? "Analyzing..." : "Upload Invoice"}
+          </button>
 
-        <button
-          onClick={handleUpload}
-          className="w-full bg-black text-white py-2 rounded-lg"
-        >
-          {loading ? "Analyzing..." : "Upload Invoice"}
-        </button>
-
-        {response && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm">
-            {response}
-          </div>
-        )}
-
-      </div>
-
+          {response && (
+            <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm text-foreground">
+              {response}
+            </div>
+          )}
+        </div>
+      </section>
     </main>
   )
 }

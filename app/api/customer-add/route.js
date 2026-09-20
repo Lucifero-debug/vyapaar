@@ -1,18 +1,29 @@
 import { NextResponse } from "next/server";
 import {connect} from '../../../lib/mongodb'
 import Customer from '../../../models/custModel'
+import { toSigned, modeOf } from '@/lib/balance.mjs'
 
 
 export async function POST(req) {
     try {
         await connect()
-        const customerData = await req.json();   
-        console.log('Received Customer Data:', customerData); 
+        const customerData = await req.json();
+        // The form sends magnitude + Dr/Cr; storage is signed.
+        const openingSigned  = toSigned(customerData.openBal, customerData.openingMode);
+        const lastYearSigned = toSigned(customerData.lastBal, customerData.lastMode);
+
         const newCustomer= new Customer({
             name:customerData.name,
             email:customerData.email,
-            openingBal:customerData.openBal,
-            lastBal:customerData.lastBal,
+            openingBal:openingSigned,
+            openingMode:modeOf(openingSigned),
+            // A new party has no transactions yet, so the running balance IS
+            // the opening balance. It used to be seeded from the "last year"
+            // field, which is unrelated master data.
+            lastBal:openingSigned,
+            lastMode:modeOf(openingSigned),
+            lastYearBal:lastYearSigned,
+            lastYearMode:modeOf(lastYearSigned),
             address:customerData.address,
             pincode:customerData.pincode,
             phone:customerData.phone,
@@ -26,23 +37,17 @@ export async function POST(req) {
             interest:customerData.interest,
             discount:customerData.discount,
             group:customerData.group,
-            pan:customerData.pan,
             short:customerData.short,
-            openingMode:customerData.openingMode,
-            lastMode:customerData.lastMode,
             dealerType:customerData.dealerType
         })
-        
+
         const savedCustomer = await newCustomer.save().catch(err => {
             console.error("Validation Error:", err);
             throw err;
         });
-        
-    console.log('Saved Customer:', savedCustomer);
-    return NextResponse.json({ message: "Email sent successfully",success:true,savedCustomer});
+
+        return NextResponse.json({ message: "Customer saved successfully", success: true, savedCustomer });
     } catch (error) {
         return NextResponse.json({error:error.message},{status:500})
     }
-      // Handle saving customerData to your database
-  }
-  
+}

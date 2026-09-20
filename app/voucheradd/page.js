@@ -185,15 +185,15 @@ const AddVoucher = () => {
         <VoucherSearchParams onParams={setVoucherParams} />
       </Suspense>
 
-      <div className="max-w-6xl mx-auto p-8 bg-white border shadow-md mt-12 font-mono text-gray-800 rounded-lg">
-        <div className="flex justify-between mb-6">
+      <div className="page-shell">
+        <div className="page-header items-start">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="page-title">
               {voucherParams.type === "Cash" ? "Cash Voucher" : "Bank Voucher"}
             </h1>
-            <p className="text-sm text-gray-600">Date: {form.date}</p>
+            <p className="page-subtitle">Date: {form.date}</p>
           </div>
-          <div className="text-right space-y-1">
+          <div className="space-y-1 text-right text-sm text-muted-foreground">
             <p>
               {voucherParams.type === "Cash" ? "Cash" : "Bank"} A/c:{" "}
               <span className="font-semibold">
@@ -216,26 +216,26 @@ const AddVoucher = () => {
         {/* --- VOUCHER FORM --- */}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full border text-sm">
-              <thead className="bg-gray-100">
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="border px-3 py-2">Account Name</th>
-                  <th className="border px-3 py-2">Narration</th> {/* 🔹 Added */}
-                  <th className="border px-3 py-2 text-right">Debit</th>
-                  <th className="border px-3 py-2 text-right">Credit</th>
-                  <th className="border px-3 py-2 text-center">Action</th>
+                  <th>Account Name</th>
+                  <th>Narration</th> {/* 🔹 Added */}
+                  <th className="text-right">Debit</th>
+                  <th className="text-right">Credit</th>
+                  <th className="text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {entries.map((entry, index) => (
-                  <tr key={index} className="border-t">
-                    <td className="border px-2 py-1">
+                  <tr key={index}>
+                    <td>
                       <select
                         name="name"
                         value={entry.name}
                         onChange={(e) => handleEntryChange(index, e)}
-                        className="w-full bg-transparent outline-none"
+                        className="w-full bg-transparent text-sm outline-none focus:ring-0"
                         required
                       >
                         <option value="" disabled>
@@ -248,39 +248,39 @@ const AddVoucher = () => {
                         ))}
                       </select>
                     </td>
-                    <td className="border px-2 py-1">
+                    <td>
                       <input
                         type="text"
                         name="narration"
                         value={entry.narration}
                         onChange={(e) => handleEntryChange(index, e)}
                         placeholder="Narration..."
-                        className="w-full bg-transparent outline-none"
+                        className="w-full bg-transparent text-sm outline-none focus:ring-0"
                       />
                     </td>
-                    <td className="border px-2 py-1 text-right">
+                    <td className="text-right">
                       <input
                         type="number"
                         name="debit"
                         value={entry.debit}
                         onChange={(e) => handleEntryChange(index, e)}
-                        className="w-full bg-transparent text-right outline-none"
+                        className="w-full bg-transparent text-right text-sm tabular-nums outline-none focus:ring-0"
                       />
                     </td>
-                    <td className="border px-2 py-1 text-right">
+                    <td className="text-right">
                       <input
                         type="number"
                         name="credit"
                         value={entry.credit}
                         onChange={(e) => handleEntryChange(index, e)}
-                        className="w-full bg-transparent text-right outline-none"
+                        className="w-full bg-transparent text-right text-sm tabular-nums outline-none focus:ring-0"
                       />
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="text-center">
                       <button
                         type="button"
                         onClick={() => removeEntry(index)}
-                        className="text-red-600 hover:underline"
+                        className="btn btn-ghost btn-sm text-destructive hover:text-destructive"
                       >
                         Remove
                       </button>
@@ -288,13 +288,13 @@ const AddVoucher = () => {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-gray-50">
+              <tfoot>
                 <tr>
-                  <td colSpan={5} className="px-3 py-2">
+                  <td colSpan={5}>
                     <button
                       type="button"
                       onClick={addEntry}
-                      className="text-blue-600 hover:underline"
+                      className="btn btn-ghost btn-sm text-primary hover:text-primary"
                     >
                       + Add Customer Row
                     </button>
@@ -305,9 +305,9 @@ const AddVoucher = () => {
           </div>
 
           {/* Account Details + Main Narration */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
+          <div className="panel panel-body grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             <div>
-              <label className="text-sm font-medium">
+              <label className="field-label">
                 {voucherParams.type === "Cash" ? "Cash A/c" : "Bank A/c"}
               </label>
               <select
@@ -315,7 +315,7 @@ const AddVoucher = () => {
                 value={form.acName}
                 onChange={handleFormChange}
                 required
-                className="w-full border px-3 py-1 rounded-md"
+                className="field-select mt-1.5"
               >
                 <option value="" disabled>
                   Select {voucherParams.type === "Cash" ? "Cash" : "Bank"} Account
@@ -335,24 +335,24 @@ const AddVoucher = () => {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Account Type</label>
+              <label className="field-label">Account Type</label>
               <input
                 type="text"
                 name="acType"
                 value={form.acType}
                 onChange={handleFormChange}
                 placeholder="e.g. Cash, Bank"
-                className="w-full border px-3 py-1 rounded-md"
+                className="field-input mt-1.5"
               />
             </div>
 
-            <label className="text-sm font-medium flex items-center gap-2 mt-5">
+            <label className="mt-6 flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
               <input
                 type="checkbox"
                 name="againstBill"
                 checked={form.againstBill}
                 onChange={handleFormChange}
-                className="form-checkbox"
+                className="field-check"
               />
               Against Bill
             </label>
@@ -360,20 +360,20 @@ const AddVoucher = () => {
 
           {/* 🔹 Main Narration Field */}
           <div>
-            <label className="text-sm font-medium">Main Narration</label>
+            <label className="field-label">Main Narration</label>
             <textarea
               name="narration"
               value={form.narration}
               onChange={handleFormChange}
               rows={2}
               placeholder="Enter narration for main account..."
-              className="w-full border px-3 py-1 rounded-md"
+              className="field-input mt-1.5 h-auto py-2"
             />
           </div>
 
           <button
             type="submit"
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+            className="btn btn-primary w-full sm:w-auto"
           >
             {voucherParams.value ? "Update Voucher" : "Add Voucher"}
           </button>
