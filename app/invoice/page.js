@@ -1,6 +1,7 @@
 'use client'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { splitGst } from '@/lib/gst.mjs';
+import { buildHsnSummary, hsnGrandTotal, lineTaxable } from '@/lib/hsnTotals.mjs';
 import AddIcCallOutlinedIcon from '@mui/icons-material/AddIcCallOutlined';
 import { useSearchParams } from 'next/navigation';
 import html2canvas from 'html2canvas';
@@ -13,11 +14,23 @@ const PageContent = () => {
   const isRollStationary = options.rollStationary;
   const searchParams = useSearchParams();
   const contentRef = useRef();
+
+/**
+ * The document on screen is responsive -- on a phone the item table scrolls
+ * sideways instead of crushing seven columns into 360px. The PDF must not
+ * inherit that: a bill downloaded from a phone has to be the same sheet as one
+ * downloaded from a desktop. `pdf-export` (see globals.css) pins the node to
+ * its paper width and unwraps the scrollers for the duration of the capture.
+ */
 const generatePDF = async (contentRef) => {
-  if (!contentRef.current) return null;
+  const node = contentRef.current;
+  if (!node) return null;
+
+  node.classList.add('pdf-export');
+  if (!isRollStationary) node.classList.add('pdf-export-wide');
 
   try {
-    const canvas = await html2canvas(contentRef.current, {
+    const canvas = await html2canvas(node, {
       scale: 2,
       useCORS: true,
       scrollY: -window.scrollY,
@@ -54,6 +67,8 @@ const generatePDF = async (contentRef) => {
   } catch (error) {
     console.error("Error generating PDF:", error);
     return null;
+  } finally {
+    node.classList.remove('pdf-export', 'pdf-export-wide');
   }
 };
 
@@ -151,11 +166,6 @@ const downloadPDF = async () => {
   const items = invoice?.items || [];
   const partyTaxes = invoice?.partyTaxes || [];
 
-  // Stored as an array of { hsn, amount, total }; the table below reads a map.
-  const hsnTotals = (invoice?.hsnTotals || []).reduce((acc, row) => {
-    acc[row.hsn] = { gstRate: row.gstRate, gstAmount: row.amount, total: row.total };
-    return acc;
-  }, {});
 
   const date = invoice?.date ? new Date(invoice.date).toISOString().substring(0, 10) : '';
   const customer = invoice?.customer?.name || '';
@@ -179,14 +189,9 @@ const downloadPDF = async () => {
   const orderNo = invoice?.orderNo || '';
   const orderDate = invoice?.orderDate ? new Date(invoice.orderDate).toLocaleDateString('en-IN') : '';
 
-// Compute total taxable amount and GST totals.
-//
-// `??` rather than `||`: a free line or one discounted to nothing has a
-// taxableAmount of 0, which is falsy, so it used to fall back to cost x
-// quantity and print at full value with full GST on it.
-const lineTaxable = (item) =>
-  Number(item.taxableAmount ?? (Number(item.cost) || 0) * (Number(item.quantity) || 0)) || 0;
-
+// Compute total taxable amount and GST totals. `lineTaxable` lives in
+// lib/hsnTotals.mjs so the summary below, and the backfill script, apply the
+// very same rule to a line.
 const totalTaxableAmount = items.reduce((sum, item) => sum + lineTaxable(item), 0);
 const totalGstAmount = items.reduce(
   (sum, item) => sum + (lineTaxable(item) * (Number(item.gstRate) || 0)) / 100,
@@ -197,6 +202,22 @@ const totalGstAmount = items.reduce(
 // rounding each side independently disagreed with the total on half of all
 // amounts, by a paisa.
 const { sgst, cgst } = splitGst(totalGstAmount);
+
+// DERIVED from the lines, never read back from the stored `hsnTotals` rows --
+// those were truncated by the schema and print as a negative taxable value
+// against a total of zero. lib/hsnTotals.mjs has the full account.
+const hsnSummary = buildHsnSummary(items);
+const hsnRows = Object.entries(hsnSummary);
+const hsnGrand = hsnGrandTotal(hsnSummary);
+
+// A seven-column bill does not fit a phone. Rather than let `table-layout:
+// fixed` squeeze item names down to a character per line, the table keeps its
+// paper width and the wrapper scrolls sideways. Roll stationary is genuinely
+// narrow paper, so there it stays fluid.
+const tableMinWidth = isRollStationary ? '' : 'min-w-[640px]';
+const hsnMinWidth = isRollStationary ? '' : 'min-w-[560px]';
+const cellPad = isRollStationary ? 'px-2 py-1.5' : 'px-2 py-2 sm:px-4 sm:py-3';
+const headCell = 'text-[11px] font-semibold uppercase tracking-wide text-gray-700 sm:text-xs';
 
   if (loadState === 'loading') {
     return <div className="page-shell text-sm text-muted-foreground">Loading invoice {invoiceNo}...</div>;
@@ -214,10 +235,11 @@ const { sgst, cgst } = splitGst(totalGstAmount);
 
   return (
     <>
+      <div className="px-3 sm:px-4">
 <div 
   ref={contentRef} 
-  className={`mx-auto my-6 bg-white border border-gray-300 rounded-xl shadow-sm text-gray-900 font-sans transition-all duration-300
-    ${isRollStationary ? 'max-w-[480px] p-3 text-[12px]' : 'max-w-3xl p-8 text-[14px]'}`}
+  className={`invoice-doc mx-auto my-4 bg-white border border-gray-300 rounded-xl shadow-sm text-gray-900 font-sans transition-all duration-300 sm:my-6
+    ${isRollStationary ? 'max-w-[480px] p-3 text-[12px]' : 'max-w-3xl p-4 text-[13px] sm:p-8 sm:text-[14px]'}`}
   style={{
     fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
     overflow: "hidden",
@@ -225,42 +247,48 @@ const { sgst, cgst } = splitGst(totalGstAmount);
 >
 
         {/* Header */}
-        <header className="mb-8 flex justify-between items-center">
-     <div className="flex items-center gap-4">
-    <div>
-      <h1 className="text-3xl font-extrabold text-gray-800 tracking-wide">Prashant Enterprise</h1>
-      <p className="mt-1 text-sm text-gray-600">GSTIN: 12ABCDE3456F7Z8</p>
-      <p className="mt-1 text-gray-700 flex items-center gap-1">
-        <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 23774
-      </p>
-    </div>
-      <div className="w-20 h-20 rounded-full overflow-hidden border border-gray-300 shadow-md flex-shrink-0">
-      <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
-    </div>
-  </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Invoice No:</p>
-            <p className="font-semibold text-lg">{invoiceNo}</p>
-            <p className="text-sm text-gray-500 mt-2">Date:</p>
-            <p className="font-semibold">{date}</p>
+        <header className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold tracking-wide text-gray-800 sm:text-3xl">Prashant Enterprise</h1>
+              <p className="mt-1 text-xs text-gray-600 sm:text-sm">GSTIN: 12ABCDE3456F7Z8</p>
+              <p className="mt-1 flex items-center gap-1 text-xs text-gray-700 sm:text-sm">
+                <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 23774
+              </p>
+            </div>
+            <div className="ml-auto h-14 w-14 flex-shrink-0 overflow-hidden rounded-full border border-gray-300 shadow-md sm:ml-0 sm:h-20 sm:w-20">
+              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
+            </div>
+          </div>
+          {/* Phone: number and date sit side by side under the masthead.
+              sm and up: the original stacked block on the right. */}
+          <div className="flex items-end justify-between gap-4 border-t border-gray-200 pt-3 sm:block sm:border-0 sm:pt-0 sm:text-right">
+            <div>
+              <p className="text-xs text-gray-500 sm:text-sm">Invoice No:</p>
+              <p className="text-base font-semibold sm:text-lg">{invoiceNo}</p>
+            </div>
+            <div className="text-right sm:mt-2">
+              <p className="text-xs text-gray-500 sm:text-sm">Date:</p>
+              <p className="font-semibold">{date}</p>
+            </div>
           </div>
         </header>
 
         {/* Customer Info */}
-        <section className="mb-6 grid grid-cols-2 gap-x-8 gap-y-2 border-t border-b border-gray-300 py-4">
-          <div>
+        <section className="mb-6 grid grid-cols-1 gap-x-8 gap-y-4 border-t border-b border-gray-300 py-4 sm:grid-cols-2 sm:gap-y-2">
+          <div className="min-w-0">
             <h2 className="font-semibold text-gray-700">Bill To:</h2>
-            <p className="mt-1">{customer}</p>
+            <p className="mt-1 break-words">{customer}</p>
             <p>{phone}</p>
             <p>{stateOfSupply}</p>
               {shippedTo && (
       <>
         <h2 className="font-semibold text-gray-700 mt-4">Shipped To:</h2>
-        <p>{shippedTo}</p>
+        <p className="break-words">{shippedTo}</p>
       </>
     )}
           </div>
-          <div>
+          <div className="min-w-0">
             <h2 className="font-semibold text-gray-700">Tax Details:</h2>
             <p className="mt-1">Tax Type: {taxType}</p>
             {taxType === 'local' ? (
@@ -274,7 +302,7 @@ const { sgst, cgst } = splitGst(totalGstAmount);
                {dispatchFrom && (
       <>
         <h2 className="font-semibold text-gray-700 mt-4">Dispatch From:</h2>
-        <p>{dispatchFrom}</p>
+        <p className="break-words">{dispatchFrom}</p>
       </>
     )}
           </div>
@@ -282,67 +310,78 @@ const { sgst, cgst } = splitGst(totalGstAmount);
 
         {/* Transport Details */}
 {(transport || grNo || grDate || pvtMark || caseDetails || freight || weight || ewayBillNo || ewayBillDate || orderNo || orderDate) && (
-  <section className="mb-6 border border-gray-300 rounded-md p-4 bg-gray-50">
+  <section className="mb-6 rounded-md border border-gray-300 bg-gray-50 p-3 sm:p-4">
     <h3 className="text-md font-semibold text-gray-700 mb-3">Order Details</h3>
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-gray-700">
+    <div className="grid grid-cols-1 gap-2 text-[13px] text-gray-700 sm:grid-cols-3 sm:gap-3 sm:text-sm">
       {transport && (
-        <div><span className="font-medium">Transport:</span> {transport}</div>
+        <div className="break-words"><span className="font-medium">Transport:</span> {transport}</div>
       )}
       {grNo && (
-        <div><span className="font-medium">GR No:</span> {grNo}</div>
+        <div className="break-words"><span className="font-medium">GR No:</span> {grNo}</div>
       )}
       {grDate && (
-        <div><span className="font-medium">GR Date:</span> {grDate}</div>
+        <div className="break-words"><span className="font-medium">GR Date:</span> {grDate}</div>
       )}
       {pvtMark && (
-        <div><span className="font-medium">Pvt Mark:</span> {pvtMark}</div>
+        <div className="break-words"><span className="font-medium">Pvt Mark:</span> {pvtMark}</div>
       )}
       {caseDetails && (
-        <div><span className="font-medium">Case:</span> {caseDetails}</div>
+        <div className="break-words"><span className="font-medium">Case:</span> {caseDetails}</div>
       )}
       {freight && (
-        <div><span className="font-medium">Freight:</span> {freight}</div>
+        <div className="break-words"><span className="font-medium">Freight:</span> {freight}</div>
       )}
       {weight && (
-        <div><span className="font-medium">Weight:</span> {weight} kg</div>
+        <div className="break-words"><span className="font-medium">Weight:</span> {weight} kg</div>
       )}
       {ewayBillNo && (
-        <div><span className="font-medium">E-Way Bill No:</span> {ewayBillNo}</div>
+        <div className="break-words"><span className="font-medium">E-Way Bill No:</span> {ewayBillNo}</div>
       )}
       {ewayBillDate && (
-        <div><span className="font-medium">E-Way Bill Date:</span> {ewayBillDate}</div>
+        <div className="break-words"><span className="font-medium">E-Way Bill Date:</span> {ewayBillDate}</div>
       )}
             {orderNo && (
-        <div><span className="font-medium">Order No:</span> {orderNo}</div>
+        <div className="break-words"><span className="font-medium">Order No:</span> {orderNo}</div>
       )}
             {orderDate && (
-        <div><span className="font-medium">Order Date:</span> {orderDate}</div>
+        <div className="break-words"><span className="font-medium">Order Date:</span> {orderDate}</div>
       )}
     </div>
   </section>
 )}
 
-
         {/* Items Table */}
+<div className="inv-scroll -mx-1 mb-6 overflow-x-auto sm:mx-0">
 <table
-  className={`border-collapse mb-6 w-full ${
-    isRollStationary ? 'text-[11px]' : 'text-sm'
+  className={`inv-table w-full border-collapse ${tableMinWidth} ${
+    isRollStationary ? 'text-[11px]' : 'text-[12px] sm:text-sm'
   }`}
   style={{
-    tableLayout: "fixed", // ✅ Ensures proper column wrapping
+    tableLayout: "fixed", // widths come from the colgroup below, not from content
     wordBreak: "break-word",
   }}
 >
-
+  {/* Without these, `fixed` splits the width seven equal ways and an item name
+      gets no more room than a GST percentage -- long names then wrap to one or
+      two characters a line. */}
+  <colgroup>
+    <col className="w-[28%]" />
+    <col className="w-[10%]" />
+    <col className="w-[13%]" />
+    <col className="w-[10%]" />
+    <col className="w-[13%]" />
+    <col className="w-[9%]" />
+    <col className="w-[17%]" />
+  </colgroup>
           <thead>
             <tr className="bg-gray-100 border-b border-gray-300">
-              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">Item</th>
-              <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700">Quantity</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Price (₹)</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Discount (%)</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">HSN Code</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">GST</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Amount (₹)</th>
+              <th className={`${cellPad} ${headCell} text-left`}>Item</th>
+              <th className={`${cellPad} ${headCell} text-center`}>Qty</th>
+              <th className={`${cellPad} ${headCell} text-right`}>Price (₹)</th>
+              <th className={`${cellPad} ${headCell} text-right`}>Disc (%)</th>
+              <th className={`${cellPad} ${headCell} text-right`}>HSN</th>
+              <th className={`${cellPad} ${headCell} text-right`}>GST</th>
+              <th className={`${cellPad} ${headCell} text-right`}>Amount (₹)</th>
             </tr>
           </thead>
     <tbody>
@@ -351,17 +390,19 @@ const { sgst, cgst } = splitGst(totalGstAmount);
     return (
       <React.Fragment key={i}>
         <tr className="border-b border-gray-200 hover:bg-gray-50">
-          <td className="py-3 px-4 text-gray-800">{item.name}</td>
-          <td className="py-3 px-4 text-center">{item.quantity}</td>
-          <td className="py-3 px-4 text-right">₹{(Number(item.cost) || 0).toFixed(2)}</td>
-          <td className="py-3 px-4 text-right">{(Number(item.discount) || 0).toFixed(2)}%</td>
-          <td className="py-3 px-4 text-right">{item.hsn}</td>
-          <td className="py-3 px-4 text-right">{item.gstRate || 0}%</td>
-          <td className="py-3 px-4 text-right font-semibold">₹{(Number(item.total) || 0).toFixed(2)}</td>
+          <td className={`${cellPad} text-gray-800`}>{item.name}</td>
+          <td className={`${cellPad} text-center tabular-nums`}>{item.quantity}</td>
+          <td className={`${cellPad} text-right tabular-nums`}>₹{(Number(item.cost) || 0).toFixed(2)}</td>
+          <td className={`${cellPad} text-right tabular-nums`}>{(Number(item.discount) || 0).toFixed(2)}%</td>
+          <td className={`${cellPad} text-right tabular-nums`}>{item.hsn}</td>
+          <td className={`${cellPad} text-right tabular-nums`}>{item.gstRate || 0}%</td>
+          <td className={`${cellPad} text-right font-semibold tabular-nums`}>₹{(Number(item.total) || 0).toFixed(2)}</td>
         </tr>
         {item.description && (
           <tr className="border-b border-gray-200 bg-gray-50">
-            <td colSpan={5} className="px-4 py-2 text-sm italic text-gray-600">
+            {/* Seven columns, not five: the row used to stop short of the
+                amount column and left a ragged hole in the bill. */}
+            <td colSpan={7} className={`${cellPad} text-[12px] italic text-gray-600 sm:text-sm`}>
               Description: {item.description}
             </td>
           </tr>
@@ -371,59 +412,56 @@ const { sgst, cgst } = splitGst(totalGstAmount);
   })}
 </tbody>
         </table>
+</div>
 
-{Object.keys(hsnTotals).length > 0 && (
-  <section className="mt-10" style={{ breakInside: 'avoid' }}>
-    <h2 className="text-lg font-bold text-gray-800 mb-3 border-b pb-1">
+{hsnRows.length > 0 && (
+  <section className="mt-8 sm:mt-10" style={{ breakInside: 'avoid' }}>
+    <h2 className="mb-3 border-b pb-1 text-base font-bold text-gray-800 sm:text-lg">
       HSN Code-wise Summary
     </h2>
-    <div className="flex justify-start">
+    <div className="inv-scroll -mx-1 overflow-x-auto sm:mx-0">
 <table
-  className={`border border-gray-300 w-full ${
-    isRollStationary ? 'text-[11px]' : 'text-sm'
+  className={`inv-table w-full border border-gray-300 ${hsnMinWidth} ${
+    isRollStationary ? 'text-[11px]' : 'text-[12px] sm:text-sm'
   }`}
   style={{
     tableLayout: "fixed",
     wordBreak: "break-word",
   }}
 >
-
+  <colgroup>
+    <col className="w-[18%]" />
+    <col className="w-[16%]" />
+    <col className="w-[22%]" />
+    <col className="w-[20%]" />
+    <col className="w-[24%]" />
+  </colgroup>
         <thead className="bg-gray-100">
           <tr>
-            <th className="py-2 px-4 text-left border-b border-gray-300">HSN Code</th>
-            <th className="py-2 px-4 text-right border-b border-gray-300">GST Rate (%)</th>
-            <th className="py-2 px-4 text-right border-b border-gray-300">Taxable Amount (₹)</th>
-            <th className="py-2 px-4 text-right border-b border-gray-300">GST Amount (₹)</th>
-            <th className="py-2 px-4 text-right border-b border-gray-300">Total Amount (₹)</th>
+            <th className={`${cellPad} ${headCell} border-b border-gray-300 text-left`}>HSN Code</th>
+            <th className={`${cellPad} ${headCell} border-b border-gray-300 text-right`}>GST Rate (%)</th>
+            <th className={`${cellPad} ${headCell} border-b border-gray-300 text-right`}>Taxable (₹)</th>
+            <th className={`${cellPad} ${headCell} border-b border-gray-300 text-right`}>GST (₹)</th>
+            <th className={`${cellPad} ${headCell} border-b border-gray-300 text-right`}>Total (₹)</th>
           </tr>
         </thead>
         <tbody>
-          {Object.entries(hsnTotals).map(([hsn, data]) => (
+          {hsnRows.map(([hsn, data]) => (
             <tr key={hsn} className="border-b border-gray-200 hover:bg-gray-50">
-              <td className="py-2 px-4">{hsn}</td>
-              <td className="py-2 px-4 text-right">{data.gstRate?.toFixed?.(2) || 0}%</td>
-              <td className="py-2 px-4 text-right">
-                ₹{(Number(data.total || 0) - Number(data.gstAmount || 0)).toFixed(2)}
-              </td>
-              <td className="py-2 px-4 text-right">₹{Number(data.gstAmount || 0).toFixed(2)}</td>
-              <td className="py-2 px-4 text-right font-medium">₹{Number(data.total || 0).toFixed(2)}</td>
+              <td className={`${cellPad} tabular-nums`}>{hsn}</td>
+              <td className={`${cellPad} text-right tabular-nums`}>{data.gstRate.toFixed(2)}%</td>
+              <td className={`${cellPad} text-right tabular-nums`}>₹{data.taxable.toFixed(2)}</td>
+              <td className={`${cellPad} text-right tabular-nums`}>₹{data.gstAmount.toFixed(2)}</td>
+              <td className={`${cellPad} text-right font-medium tabular-nums`}>₹{data.total.toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
         <tfoot className="bg-gray-50 font-semibold">
           <tr>
-            <td className="py-2 px-4 text-right" colSpan={2}>Grand Total</td>
-            <td className="py-2 px-4 text-right">
-              ₹{Object.values(hsnTotals)
-                .reduce((sum, d) => sum + ((d.total || 0) - (d.gstAmount || 0)), 0)
-                .toFixed(2)}
-            </td>
-            <td className="py-2 px-4 text-right">
-              ₹{Object.values(hsnTotals).reduce((sum, d) => sum + (d.gstAmount || 0), 0).toFixed(2)}
-            </td>
-            <td className="py-2 px-4 text-right">
-              ₹{Object.values(hsnTotals).reduce((sum, d) => sum + (d.total || 0), 0).toFixed(2)}
-            </td>
+            <td className={`${cellPad} text-right`} colSpan={2}>Grand Total</td>
+            <td className={`${cellPad} text-right tabular-nums`}>₹{hsnGrand.taxable.toFixed(2)}</td>
+            <td className={`${cellPad} text-right tabular-nums`}>₹{hsnGrand.gstAmount.toFixed(2)}</td>
+            <td className={`${cellPad} text-right tabular-nums`}>₹{hsnGrand.total.toFixed(2)}</td>
           </tr>
         </tfoot>
       </table>
@@ -432,51 +470,71 @@ const { sgst, cgst } = splitGst(totalGstAmount);
 )}
 
 {partyTaxes?.length > 0 && (
-  <section className="max-w-xs ml-auto mt-4 text-right space-y-1">
+  <section className="mt-6 w-full space-y-1 sm:ml-auto sm:mt-4 sm:max-w-xs">
     <h3 className="text-md font-semibold text-gray-700 mb-2">Additional Overhead:</h3>
     {partyTaxes.map((tax, idx) => (
-      <div key={idx} className="text-sm text-gray-600 flex justify-between">
-        <span>{tax.name} ({tax.rate ? `${tax.rate}%` : `₹${tax.total}`}):</span>
-        <span>₹{parseFloat(tax.total).toFixed(2)}</span>
+      <div key={idx} className="flex justify-between gap-3 text-[13px] text-gray-600 sm:text-sm">
+        <span className="break-words">{tax.name} ({tax.rate ? `${tax.rate}%` : `₹${tax.total}`}):</span>
+        <span className="whitespace-nowrap tabular-nums">₹{parseFloat(tax.total).toFixed(2)}</span>
       </div>
     ))}
   </section>
 )}
 
         {/* Summary */}
-           <section className="mt-10 max-w-sm ml-auto text-right" style={{ breakInside: 'avoid' }}>
+           <section className="mt-8 w-full sm:ml-auto sm:mt-10 sm:max-w-sm" style={{ breakInside: 'avoid' }}>
           <h2 className="text-md font-bold text-gray-800 mb-2 border-b pb-1">Invoice Summary</h2>
-          <p><strong>Total:</strong> ₹{finalAmount.toFixed(2)}</p>
-          <p><strong>Received:</strong> ₹{received.toFixed(2)}</p>
-          <p><strong>Balance Due:</strong> ₹{balanceDue.toFixed(2)}</p>
+          <div className="space-y-1">
+            <div className="flex justify-between gap-4">
+              <strong>Total:</strong>
+              <span className="tabular-nums">₹{finalAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <strong>Received:</strong>
+              <span className="tabular-nums">₹{received.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <strong>Balance Due:</strong>
+              <span className="tabular-nums">₹{balanceDue.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <strong>Taxable Amount:</strong>
+              <span className="tabular-nums">₹{totalTaxableAmount.toFixed(2)}</span>
+            </div>
 {taxType === 'local' ? (
   <>
-    <p><strong>Taxable Amount:</strong> ₹{totalTaxableAmount.toFixed(2)}</p>
-    <p><strong>SGST:</strong> ₹{sgst.toFixed(2)}</p>
-    <p><strong>CGST:</strong> ₹{cgst.toFixed(2)}</p>
+    <div className="flex justify-between gap-4">
+      <strong>SGST:</strong>
+      <span className="tabular-nums">₹{sgst.toFixed(2)}</span>
+    </div>
+    <div className="flex justify-between gap-4">
+      <strong>CGST:</strong>
+      <span className="tabular-nums">₹{cgst.toFixed(2)}</span>
+    </div>
   </>
 ) : (
-  <>
-    <p><strong>Taxable Amount:</strong> ₹{totalTaxableAmount.toFixed(2)}</p>
-    <p><strong>IGST:</strong> ₹{totalGstAmount.toFixed(2)}</p>
-  </>
+  <div className="flex justify-between gap-4">
+    <strong>IGST:</strong>
+    <span className="tabular-nums">₹{totalGstAmount.toFixed(2)}</span>
+  </div>
 )}
-
+          </div>
         </section>
 
         {/* Footer */}
-        <footer className="mt-12 border-t border-gray-300 pt-6 text-center text-gray-600 text-sm">
+        <footer className="mt-10 border-t border-gray-300 pt-5 text-center text-[13px] text-gray-600 sm:mt-12 sm:pt-6 sm:text-sm">
           <p>Thank you for doing business with us.</p>
           <p>Please contact us if you have any questions about this invoice.</p>
         </footer>
       </div>
+      </div>
 
       {/* Button */}
-      <div className='no-print sticky bottom-0 mt-6 flex items-center justify-center gap-3 border-t border-border bg-card/90 px-4 py-4 backdrop-blur'>
-        <button onClick={() => window.print()} className='btn btn-secondary' type="button">
+      <div className='no-print sticky bottom-0 mt-6 flex flex-col items-center justify-center gap-2 border-t border-border bg-card/90 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:flex-row sm:gap-3 sm:py-4'>
+        <button onClick={() => window.print()} className='btn btn-secondary w-full sm:w-auto' type="button">
           Print
         </button>
-        <button onClick={downloadPDF} className='btn btn-primary' type="button">
+        <button onClick={downloadPDF} className='btn btn-primary w-full sm:w-auto' type="button">
           Download Invoice
         </button>
       </div>

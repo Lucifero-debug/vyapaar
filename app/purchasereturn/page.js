@@ -762,7 +762,7 @@ const handleDispatchSave = () => {
 
                     {selectedItem && selectedItem.length > 0 ? (
                         <div className='table-wrap'>
-                            <table className='data-table'>
+                            <table className='data-table min-w-[720px]'>
                                 <thead>
                                     <tr>
                                         <th>Name</th>
@@ -1050,7 +1050,7 @@ const handleDispatchSave = () => {
                 </section>
 
                 {/* Save Button */}
-                <div className='sticky bottom-0 -mx-4 mt-2 flex border-t border-border bg-card/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6'>
+                <div className='sticky bottom-0 -mx-4 mt-2 flex border-t border-border bg-card/90 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:-mx-6 sm:px-6'>
                 <button 
                     className='btn btn-primary mx-auto h-11 w-fit px-8 text-base' 
                     onClick={handleSave}

@@ -126,7 +126,7 @@ export default function VoucherPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="data-table table-fixed">
+                <table className="data-table table-fixed min-w-[560px]">
                   <thead>
                     <tr>
                       <th className="w-[40%]">ACCOUNT</th>
@@ -165,8 +165,8 @@ export default function VoucherPage() {
             </div>
           ))}
 
-          <div className="overflow-hidden rounded-xl border border-primary/30 bg-accent/50">
-            <table className="data-table table-fixed">
+          <div className="overflow-x-auto rounded-xl border border-primary/30 bg-accent/50">
+            <table className="data-table table-fixed min-w-[560px]">
               <tfoot>
                 <tr>
                   <td colSpan="2" className="num text-base">

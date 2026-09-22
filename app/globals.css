@@ -303,10 +303,12 @@
 
   /* Modals built without Radix (the sale/purchase prompts) */
   .modal-overlay {
-    @apply fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm;
+    @apply fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/40 p-4 backdrop-blur-sm;
   }
+  /* A prompt opened on a phone with the keyboard up has less than 300px of
+     height to live in, so the card scrolls rather than running off-screen. */
   .modal-card {
-    @apply w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl;
+    @apply max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-xl sm:p-6;
   }
   .modal-title {
     @apply text-base font-semibold text-foreground;
@@ -365,5 +367,55 @@
   }
   tr {
     break-inside: avoid;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Invoice document — one sheet, three renderings
+
+   On screen the bill is fluid and its wide tables scroll sideways on a phone
+   rather than crushing seven columns into 360px. Paper has no such problem, so
+   for print and for the html2canvas capture the scrollers are unwrapped again.
+   ────────────────────────────────────────────────────────────── */
+.pdf-export .inv-scroll {
+  overflow: visible !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.pdf-export .inv-table {
+  min-width: 0 !important;
+}
+
+/* A bill downloaded from a phone has to be the same sheet as one downloaded
+   from a desktop, so the node is pinned to its paper width for the capture.
+   Roll stationary keeps its own narrow width and only gets the rules above. */
+.pdf-export-wide {
+  width: 768px !important;
+  max-width: none !important;
+  padding: 2rem !important;
+  font-size: 14px !important;
+}
+
+@media print {
+  .invoice-doc {
+    max-width: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+  }
+  .inv-scroll {
+    overflow: visible !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .inv-table {
+    min-width: 0 !important;
+  }
+}
+
+/* Dynamic viewport units where they exist: on a phone the browser chrome
+   collapses as you scroll, and 100vh would otherwise overshoot the screen. */
+@supports (height: 100dvh) {
+  .modal-card {
+    max-height: calc(100dvh - 2rem);
   }
 }

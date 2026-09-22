@@ -9,7 +9,10 @@ const itemSchema = new mongoose.Schema({
   description: {type: String},
   hsn:{type:String},
   gstRate:{type:Number},
-  taxableAmount:{type:Number}
+  taxableAmount:{type:Number},
+  // Also sent on every save and also silently dropped until now. Readers
+  // fall back to taxableAmount * gstRate, so nothing depended on it.
+  gstAmount:{type:Number}
 });
 
 const partyTaxSchema = new mongoose.Schema({
@@ -34,10 +37,17 @@ customer: {
   },
   required: false
 },
+    // Declared in full. Only { hsn, amount } used to be here, so Mongoose
+    // strict mode dropped the gstRate and total the form sends with every
+    // row: the HSN summary on the printed bill then read them back as zero
+    // and showed the tax as a negative taxable amount against a total of 0.
     hsnTotals: [
   {
     hsn: { type: String, required: true },
+    gstRate: { type: Number },
+    // The GST charged on this HSN group, not the taxable value.
     amount: { type: Number, required: true },
+    total: { type: Number },
   }
 ],
     paymentType: { type: String },  // e.g. Cash / Cheque

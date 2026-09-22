@@ -208,7 +208,7 @@ if (data.all) {
           <span className="chip">({inside.length} Entries)</span>
         </div>
 
-        <div className="overflow-x-auto"><table className="data-table">
+        <div className="overflow-x-auto"><table className="data-table min-w-[560px]">
           <thead>
             <tr>
               <th className="w-[15%]">DATE</th>

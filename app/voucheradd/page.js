@@ -217,7 +217,7 @@ const AddVoucher = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Table */}
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table min-w-[680px]">
               <thead>
                 <tr>
                   <th>Account Name</th>

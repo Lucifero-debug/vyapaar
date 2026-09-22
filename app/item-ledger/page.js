@@ -207,7 +207,7 @@ let runningQty =
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto"><table className="data-table">
+        <div className="overflow-x-auto"><table className="data-table min-w-[720px]">
           <thead>
             <tr>
               <th className="w-[10%]">DATE</th>
