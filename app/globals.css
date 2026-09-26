@@ -419,3 +419,13 @@
     max-height: calc(100dvh - 2rem);
   }
 }
+
+/* Date-range printing: every invoice starts on a fresh sheet. */
+@media print {
+  .invoice-print-page {
+    break-after: page;
+  }
+  .invoice-print-page:last-child {
+    break-after: auto;
+  }
+}

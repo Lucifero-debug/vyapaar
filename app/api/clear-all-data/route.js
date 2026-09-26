@@ -6,6 +6,7 @@ import Voucher from "../../../models/voucherModel";
 import ItemLedger from "@/models/itemLedgerModel";
 import Ledger from "../../../models/ledgerModel";
 import Counter from "../../../models/counterModel";
+import PriceList from "../../../models/priceListModel";
 import { NextResponse } from "next/server";
 import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
 
@@ -51,6 +52,7 @@ export async function DELETE(req) {
         Customer.deleteMany({}, { session }),
         Invoice.deleteMany({}, { session }),
         Hsn.deleteMany({}, { session }),
+        PriceList.deleteMany({}, { session }),
         Voucher.deleteMany({}, { session }),
         ItemLedger.deleteMany({}, { session }),
         Ledger.deleteMany({}, { session }),

@@ -11,9 +11,11 @@ import {
   Package,
   Pencil,
   Plus,
+  Printer,
   ReceiptIndianRupee,
   ScrollText,
   Settings,
+  Tags,
   ShoppingCart,
   Trash2,
   Undo2,
@@ -47,6 +49,8 @@ import {
   PopoverTrigger,
 } from '../components/ui/popover';
 import HsnMaster from '@/components/HsnMaster';
+import PriceListMaster from '@/components/PriceListMaster';
+import { priceListLabel } from '@/lib/priceList.mjs';
 
 const currency = (n) =>
   `₹${Number(n || 0).toLocaleString('en-IN', {
@@ -75,23 +79,28 @@ const Page = () => {
   const [del, setDel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedHsn, setSelectedHsn] = useState(null);
+  const [priceLists, setPriceLists] = useState([]);
+  const [showPriceListMaster, setShowPriceListMaster] = useState(false);
+  const [selectedPriceList, setSelectedPriceList] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [itemRes, custRes, invRes, hsnRes, voucherRes] = await Promise.all([
+        const [itemRes, custRes, invRes, hsnRes, voucherRes, priceListRes] = await Promise.all([
           fetch('/api/get-item'),
           fetch('/api/get-customer'),
           fetch('/api/get-invoice'),
           fetch('/api/get-hsn'),
           fetch('/api/get-voucher'),
+          fetch('/api/get-price-list'),
         ]);
-        const [itemData, custData, invData, hsnData, voucherData] = await Promise.all([
+        const [itemData, custData, invData, hsnData, voucherData, priceListData] = await Promise.all([
           itemRes.json(),
           custRes.json(),
           invRes.json(),
           hsnRes.json(),
           voucherRes.json(),
+          priceListRes.json(),
         ]);
 
         setCustomer(
@@ -113,6 +122,14 @@ const Page = () => {
             ...hs,
             id: hs._id
           })) || []
+        );
+
+        setPriceLists(
+          (priceListData.priceList || []).map(pl => ({
+            ...pl,
+            id: pl._id,
+            name: priceListLabel(pl)
+          }))
         );
 
         setBank(
@@ -198,6 +215,14 @@ const Page = () => {
           }
           break;
         }
+        case 'PriceList': {
+          const selected = priceLists.find(pl => pl.id === newValue);
+          if (selected) {
+            setSelectedPriceList(selected);
+            setShowPriceListMaster(true);
+          }
+          break;
+        }
         case 'Bank':
           router.push(`/voucheradd?type=Bank&value=${newValue}`);
           break;
@@ -229,6 +254,9 @@ const Page = () => {
       case 'HSN':
         endpoint = `/api/delete-hsn?id=${currentValue}`;
         break;
+      case 'PriceList':
+        endpoint = `/api/delete-price-list?id=${currentValue}`;
+        break;
       case 'Bank':
         endpoint = `/api/delete-voucher?id=${currentValue}&type=Bank`;
         break;
@@ -246,8 +274,9 @@ const Page = () => {
       if (result.success) {
         window.location.reload();
       } else {
-        console.error('Failed to delete:', result.error);
-        alert(`Failed to delete: ${result.error}`);
+        const reason = result.error || result.message;
+        console.error('Failed to delete:', reason);
+        alert(`Failed to delete: ${reason}`);
       }
     } catch (error) {
       console.error('Error during delete request:', error);
@@ -286,6 +315,7 @@ const Page = () => {
       case 'Customer': return customer;
       case 'Item': return item;
       case 'HSN': return hsn;
+      case 'PriceList': return priceLists;
       case 'Bank': return bank;
       case 'Cash': return cash;
       case 'SaleInvoice': return saleInvoices;
@@ -299,6 +329,7 @@ const Page = () => {
   const isNamed = (sectionName) =>
     sectionName === 'Customer' ||
     sectionName === 'Item' ||
+    sectionName === 'PriceList' ||
     sectionName === 'Bank' ||
     sectionName === 'Cash';
 
@@ -649,6 +680,16 @@ const Page = () => {
               setShowHsnMaster(true);
               },
             })}
+            {renderModuleRow({
+              section: "PriceList",
+              label: "Price Lists",
+              icon: Tags,
+              count: priceLists.length,
+              onCreate: () => {
+                setSelectedPriceList(null);
+                setShowPriceListMaster(true);
+              },
+            })}
           </div>
         </section>
 
@@ -707,6 +748,18 @@ const Page = () => {
               <span className="flex-1">Voucher Register</span>
             </button>
 
+            <button type="button" className="nav-tile" onClick={() => router.push('/invoice-range')}>
+              <span className="nav-tile-icon">
+                <Printer className="h-[18px] w-[18px]" />
+              </span>
+              <span className="flex-1">
+                Print Invoices
+                <span className="block text-xs font-normal text-muted-foreground">
+                  All invoices between two dates
+                </span>
+              </span>
+            </button>
+
             <button type="button" className="nav-tile" onClick={() => router.push('/upload')}>
               <span className="nav-tile-icon">
                 <Upload className="h-[18px] w-[18px]" />
@@ -731,11 +784,25 @@ const Page = () => {
       {showHsnMaster && (
         <HsnMaster
           open={showHsnMaster}
-          onClose={() => {
+          onClose={(saved) => {
             setShowHsnMaster(false);
             setSelectedHsn(null);
+            if (saved === true) window.location.reload();
           }}
           selected={selectedHsn}
+        />
+      )}
+
+      {showPriceListMaster && (
+        <PriceListMaster
+          open={showPriceListMaster}
+          onClose={(saved) => {
+            setShowPriceListMaster(false);
+            setSelectedPriceList(null);
+            closePicker();
+            if (saved) window.location.reload();
+          }}
+          selected={selectedPriceList}
         />
       )}
     </div>

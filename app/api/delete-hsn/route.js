@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
+import mongoose from "mongoose";
 import Hsn from "../../../models/hsnModel";
+import Item from "../../../models/itemModel";
 
 
 export async function POST(req) {
@@ -14,11 +16,29 @@ export async function POST(req) {
       return NextResponse.json({ error: "Id missing in query." }, { status: 400 });
     }
 
-    const deletedHsn = await Hsn.findByIdAndDelete(id);
-
-    if (!deletedHsn) {
-      return NextResponse.json({ error: "Item not found." }, { status: 404 });
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "Invalid HSN id." }, { status: 400 });
     }
+
+    const hsn = await Hsn.findById(id);
+    if (!hsn) {
+      return NextResponse.json({ error: "HSN not found." }, { status: 404 });
+    }
+
+    // Items store the HSN by code and pick it from the HSN list when edited;
+    // deleting a code still in use would leave those items pointing at nothing.
+    const inUse = await Item.countDocuments({ hsn: hsn.hsncode });
+    if (inUse) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot delete HSN ${hsn.hsncode} because ${inUse} item(s) use it. Change their HSN first.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    const deletedHsn = await Hsn.findByIdAndDelete(id);
 
     return NextResponse.json({
       message: "Hsn deleted successfully",

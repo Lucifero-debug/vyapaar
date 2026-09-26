@@ -13,13 +13,15 @@
     "export": "next export",
     "migrate:balances": "node scripts/migrate-balances.mjs",
     "migrate:balances:apply": "node scripts/migrate-balances.mjs --apply",
-    "test": "node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/backfill-hsn-totals.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs && node scripts/posting-invariants.test.mjs",
+    "test": "node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/backfill-hsn-totals.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs && node scripts/posting-invariants.test.mjs && node scripts/price-list.test.mjs && node scripts/clear-zero-units.test.mjs",
     "rebuild:voucher-ledger": "node scripts/rebuild-voucher-ledger.mjs",
     "rebuild:voucher-ledger:apply": "node scripts/rebuild-voucher-ledger.mjs --apply",
     "backfill:hsn-totals": "node scripts/backfill-hsn-totals.mjs",
     "backfill:hsn-totals:apply": "node scripts/backfill-hsn-totals.mjs --apply",
     "reset:data": "node scripts/reset-data.mjs",
-    "reset:data:apply": "node scripts/reset-data.mjs --apply"
+    "reset:data:apply": "node scripts/reset-data.mjs --apply",
+    "clear:zero-units": "node scripts/clear-zero-units.mjs",
+    "clear:zero-units:apply": "node scripts/clear-zero-units.mjs --apply"
   },
   "dependencies": {
     "@capacitor/cli": "^7.4.4",

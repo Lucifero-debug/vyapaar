@@ -31,7 +31,7 @@ const customerSchema = new mongoose.Schema({
     type:Number,
    }, 
    stateCode:{
-    type:Number,
+    type:String,
    }, 
    bank:{
     type:String,

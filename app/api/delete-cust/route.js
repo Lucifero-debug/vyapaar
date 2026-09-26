@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connect } from "../../../lib/mongodb";
 import Customer from "@/models/custModel";
 import Invoice from "../../../models/invoiceModel";
 import Voucher from "../../../models/voucherModel";
 import Ledger from "../../../models/ledgerModel";
+import PriceList from "../../../models/priceListModel";
 
 export async function POST(req) {
   try {
@@ -16,23 +18,31 @@ export async function POST(req) {
       return NextResponse.json({ error: "Id missing in query." }, { status: 400 });
     }
 
-    const existingInvoice = await Invoice.findOne({ "customer.custId": id });
-
-    if (existingInvoice) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Customer cannot be deleted because invoices exist for this customer.",
-          invoiceNo: existingInvoice.invoiceNo,
-        },
-        { status: 409 } // Conflict
-      );
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "Invalid customer id." }, { status: 400 });
     }
 
     const customer = await Customer.findById(id);
 
     if (!customer) {
       return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+    }
+
+    // By name as well as id: an invoice can carry the id of an earlier party
+    // of the same name, and the voucher and ledger checks below go by name too.
+    const existingInvoice = await Invoice.findOne({
+      $or: [{ "customer.custId": id }, { "customer.name": customer.name }],
+    });
+
+    if (existingInvoice) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Customer cannot be deleted because it is used in invoice #${existingInvoice.invoiceNo}.`,
+          invoiceNo: existingInvoice.invoiceNo,
+        },
+        { status: 409 } // Conflict
+      );
     }
 
     // Invoices were the only thing checked, so a party with nothing but
@@ -61,6 +71,18 @@ export async function POST(req) {
         {
           success: false,
           message: "Customer cannot be deleted because ledger entries exist for this customer.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const existingPriceList = await PriceList.findOne({ party: customer._id });
+
+    if (existingPriceList) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Customer cannot be deleted because a price list exists for this customer.",
         },
         { status: 409 }
       );

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import Customer from '../../../models/custModel'
 import Invoice from '../../../models/invoiceModel'
 import Ledger from '../../../models/ledgerModel'
@@ -6,11 +7,16 @@ import ItemLedger from '../../../models/itemLedgerModel'
 import Voucher from '../../../models/voucherModel'
 import { applyDelta, modeOf, round2, toSigned } from '@/lib/balance.mjs'
 import { withTransaction, AbortTransaction } from '@/lib/withTransaction.mjs'
+import { normalizeStateCode } from '@/lib/gst.mjs'
 
 export async function POST(req) {
     try {
         const customerData = await req.json();
         const customerId = customerData.id;
+
+        if (!mongoose.isValidObjectId(customerId)) {
+            return NextResponse.json({ error: "Invalid customer id." }, { status: 400 });
+        }
 
         // The rename cascade and the balance adjustment commit together: a
         // half-applied rename leaves history under two different names.
@@ -72,7 +78,7 @@ export async function POST(req) {
                 interest: customerData.interest,
                 discount: customerData.discount,
                 group: customerData.group,
-                stateCode: customerData.stateCode,
+                stateCode: normalizeStateCode(customerData.stateCode),
                 short: customerData.short,
                 dealerType: customerData.dealerType,
             });

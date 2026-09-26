@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {connect} from '../../../lib/mongodb'
 import Customer from '../../../models/custModel'
 import { toSigned, modeOf } from '@/lib/balance.mjs'
+import { normalizeStateCode } from '@/lib/gst.mjs'
 
 
 export async function POST(req) {
@@ -30,7 +31,7 @@ export async function POST(req) {
             city:customerData.city,
             state:customerData.state,
             gstIn:customerData.gstIn,
-            stateCode:customerData.stateCode,
+            stateCode:normalizeStateCode(customerData.stateCode),
             pan:customerData.pan,
             aadhar:customerData.aadhar,
             bank:customerData.bank,

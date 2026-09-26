@@ -34,8 +34,8 @@ const HsnMaster = ({ open, onClose, selected }) => {
   }, [open]);
 
   const handleSaveHsn = async () => {
-    if (!hsnForm.hsncode || !hsnForm.hsnname) {
-      alert('Please fill required fields');
+    if (!hsnForm.hsncode || !hsnForm.hsnname || hsnForm.gst === '') {
+      alert('Please fill HSN Code, HSN Name and GST %');
       return;
     }
 
@@ -50,7 +50,9 @@ const HsnMaster = ({ open, onClose, selected }) => {
     if (result.success) {
       setHsnForm({ hsncode: '', hsnname: '', gst: '', gstunit: '' });
       setIsEditing(false);
-      onClose();
+      onClose(true);
+    } else {
+      alert(result.error || result.message || 'Could not save HSN');
     }
   };
 

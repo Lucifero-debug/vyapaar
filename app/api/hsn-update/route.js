@@ -12,11 +12,27 @@ export async function POST(req) {
 
     const { hsncode, hsnname, gst, gstunit, id } = body;
 
-    if (!hsncode) {
+    // Blank GST would be written through to every item on this HSN as null.
+    if (!hsncode || gst === "" || gst === null || gst === undefined) {
       return NextResponse.json(
         {
           success: false,
-          message: "HSN code is required",
+          message: "HSN code and GST are required",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Renaming onto another HSN's code would hit the unique index as a 500.
+    const clash = await Hsn.findOne({
+      hsncode: String(hsncode).trim(),
+      _id: { $ne: id },
+    });
+    if (clash) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "HSN already exists",
         },
         { status: 400 }
       );

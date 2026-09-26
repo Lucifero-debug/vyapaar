@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connect } from "../../../lib/mongodb";
 import Item from "@/models/itemModel";
 import Invoice from "../../../models/invoiceModel";
+import PriceList from "../../../models/priceListModel";
 
 export async function POST(req) {
   try {
@@ -12,6 +14,10 @@ export async function POST(req) {
 
     if (!id) {
       return NextResponse.json({ error: "Id missing in query." }, { status: 400 });
+    }
+
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "Invalid item id." }, { status: 400 });
     }
 
         const existingInvoice = await Invoice.findOne({ "items._id": id });
@@ -33,8 +39,11 @@ export async function POST(req) {
       return NextResponse.json({ error: "Item not found." }, { status: 404 });
     }
 
+    // Drop the item's rate from every price list so none keeps a dead row.
+    await PriceList.updateMany({}, { $pull: { items: { itemId: deletedItem._id } } });
+
     return NextResponse.json({
-      message: "Invoice deleted successfully",
+      message: "Item deleted successfully",
       success: true,
       deletedItem,
     });

@@ -2,6 +2,7 @@
 import React, { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toDisplay } from '@/lib/balance.mjs'
+import { normalizeStateCode } from '@/lib/gst.mjs'
 import { Button } from "../../components/ui/button"
 import {
   Card, CardContent, CardDescription,
@@ -34,7 +35,7 @@ const PageContent = () => {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [gstIn, setGstIn] = useState('');
-  const [stateCode, setStateCode] = useState(0);
+  const [stateCode, setStateCode] = useState('');
   const [email, setEmail] = useState('');
   const [aadhar, setAadhar] = useState('');
   const [pan, setPan] = useState('');
@@ -72,7 +73,7 @@ const PageContent = () => {
           setCity(d.city || '');
           setState(d.state || '');
           setGstIn(d.gstIn || '');
-          setStateCode(d.stateCode || 0);
+          setStateCode(normalizeStateCode(d.stateCode));
           setEmail(d.email || '');
           setAadhar(d.aadhar || '');
           setPan(d.pan || '');
@@ -103,9 +104,13 @@ const PageContent = () => {
         body: JSON.stringify(customerData),
       });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        // e.g. renaming onto a customer that already exists
+        alert(result.error || result.message || 'Failed to save customer data.');
+        return;
+      }
 
-      const result = await response.json();
       alert(`Customer data ${value ? 'updated' : 'saved'} successfully!`);
       console.log(result);
     } catch (error) {
@@ -235,7 +240,7 @@ const PageContent = () => {
                 { label: 'Phone', val: phone, fn: setPhone, type: 'number' },
                 { label: 'GSTIN', val: gstIn, fn: setGstIn, type: 'text' },
                 { label: 'State', val: state, fn: setState, type: 'text' },
-                { label: 'State Code', val: stateCode, fn: setStateCode, type: 'number' },
+                { label: 'State Code', val: stateCode, fn: (v) => setStateCode(v.replace(/\D/g, '').slice(0, 2)), type: 'text', inputMode: 'numeric', placeholder: 'e.g. 07' },
                 { label: 'Email', val: email, fn: setEmail, type: 'text' },
                 { label: 'PAN', val: pan, fn: setPan, type: 'text' },
                 { label: 'Aadhar', val: aadhar, fn: setAadhar, type: 'text' },
@@ -248,6 +253,8 @@ const PageContent = () => {
                   <Label>{field.label}</Label>
                   <Input
                     type={field.type}
+                    inputMode={field.inputMode}
+                    placeholder={field.placeholder}
                     value={field.val}
                     onChange={e => field.fn(field.type === 'number' ? +e.target.value : e.target.value)}
                   />
