@@ -6,27 +6,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { cascadeDiscount, netRate } from '@/lib/priceList.mjs';
+import { netRate, rowDiscount } from '@/lib/priceList.mjs';
 
 const today = () => new Date().toISOString().substring(0, 10);
 
-const BLANK_ROWS = 10;
-const emptyRow = () => ({
-  key: Math.random().toString(36).slice(2),
-  itemId: '', name: '', unit: '',
-  salePrice: '', mrp: '', dis1: '', dis2: '', dis3: '',
-});
-
-const padRows = (rows) => {
-  const out = [...rows];
-  while (out.length < BLANK_ROWS) out.push(emptyRow());
-  return out;
-};
+const newKey = () => Math.random().toString(36).slice(2);
 
 /**
- * A party's price list, entered the way the shop's old software does it: one
- * row per item, with the unit, the rate, the MRP and the three-step discount
- * chain side by side, and blank rows waiting at the bottom.
+ * A party's price list: one row per item, with the unit, the rate, the MRP
+ * and the discount side by side. Items are added one at a time from the
+ * picker above the grid and removed with the × on their row.
  *
  * A blank Sale Price means "bill at the item master's rate" -- which is not
  * the same as entering 0.
@@ -37,17 +26,25 @@ const PriceListMaster = ({ open, onClose, selected }) => {
   const [remark, setRemark] = useState('');
   const [parties, setParties] = useState([]);
   const [items, setItems] = useState([]);
-  const [rows, setRows] = useState(padRows([]));
-  const [activeRow, setActiveRow] = useState(0);
+  const [rows, setRows] = useState([]);
+  const [pick, setPick] = useState('');
+  const [activeRow, setActiveRow] = useState(-1);
   const [saving, setSaving] = useState(false);
   const isEditing = Boolean(selected?._id);
   const gridRef = useRef(null);
+  const pickRef = useRef(null);
 
   const itemsByName = useMemo(() => {
     const map = new Map();
     items.forEach((it) => map.set((it.name || '').toLowerCase(), it));
     return map;
   }, [items]);
+
+  // Items already on the list are left out of the picker.
+  const pickable = useMemo(() => {
+    const listed = new Set(rows.map((r) => String(r.itemId)));
+    return items.filter((it) => !listed.has(String(it._id)));
+  }, [items, rows]);
 
   useEffect(() => {
     if (!open) return;
@@ -65,32 +62,31 @@ const PriceListMaster = ({ open, onClose, selected }) => {
 
   useEffect(() => {
     if (!open) return;
+    setPick('');
+    setActiveRow(-1);
 
     if (!selected) {
       setParty('');
       setDate(today());
       setRemark('');
-      setRows(padRows([]));
-      setActiveRow(0);
+      setRows([]);
       return;
     }
 
     setParty(selected.party ? String(selected.party) : '');
     setDate(selected.date ? new Date(selected.date).toISOString().substring(0, 10) : today());
     setRemark(selected.remark || '');
-    setRows(padRows((selected.items || []).map((row) => ({
-      key: Math.random().toString(36).slice(2),
+    setRows((selected.items || []).map((row) => ({
+      key: newKey(),
       itemId: String(row.itemId || ''),
       name: row.name || '',
       unit: row.unit || '',
       // `price` is what the rate was called before the discount columns existed.
       salePrice: row.salePrice ?? row.price ?? '',
       mrp: row.mrp ?? '',
-      dis1: row.dis1 || '',
-      dis2: row.dis2 || '',
-      dis3: row.dis3 || '',
-    }))));
-    setActiveRow(0);
+      // Lists saved with the old Dis 1/2/3 chain open with it merged into one.
+      discount: rowDiscount(row) || '',
+    })));
   }, [open, selected]);
 
   const setCell = (index, field, value) => {
@@ -101,43 +97,49 @@ const PriceListMaster = ({ open, onClose, selected }) => {
     });
   };
 
-  /** Picking an item seeds the row from the item master; the user overrides. */
-  const chooseItem = (index, typedName) => {
-    const match = itemsByName.get(typedName.trim().toLowerCase());
-    setRows((prev) => {
-      const next = [...prev];
-      const row = { ...next[index], name: typedName };
+  /** Adds the picked item, seeded from the item master; the user overrides. */
+  const addItem = useCallback(() => {
+    const name = pick.trim();
+    if (!name) {
+      pickRef.current?.focus();
+      return;
+    }
+    const match = itemsByName.get(name.toLowerCase());
+    if (!match) {
+      alert(`"${name}" is not in the item master. Pick it from the list, or add it under Items first.`);
+      return;
+    }
+    if (rows.some((r) => String(r.itemId) === String(match._id))) {
+      alert(`${match.name} is already on this price list.`);
+      return;
+    }
 
-      if (match) {
-        row.itemId = match._id;
-        row.unit = row.unit || match.unit || '';
-        if (row.salePrice === '') row.salePrice = match.salePrice ?? '';
-        if (row.mrp === '') row.mrp = match.mrp ?? '';
-        if (row.dis1 === '' && match.discount) row.dis1 = String(match.discount);
-      } else {
-        row.itemId = '';
-      }
-
-      next[index] = row;
-      return next;
+    const index = rows.length;
+    setRows((prev) => [
+      ...prev,
+      {
+        key: newKey(),
+        itemId: String(match._id),
+        name: match.name,
+        unit: match.unit || '',
+        salePrice: match.salePrice ?? '',
+        mrp: match.mrp ?? '',
+        discount: match.discount ? String(match.discount) : '',
+      },
+    ]);
+    setPick('');
+    setActiveRow(index);
+    // Straight into the new row's Sale Price, ready to type over.
+    requestAnimationFrame(() => {
+      gridRef.current?.querySelector(`[data-cell="${index}:salePrice"]`)?.select();
     });
-  };
-
-  const addRow = useCallback(() => {
-    setRows((prev) => {
-      setActiveRow(prev.length);
-      return [...prev, emptyRow()];
-    });
-  }, []);
+  }, [pick, itemsByName, rows]);
 
   const deleteRow = useCallback((index) => {
-    setRows((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      return next.length ? padRows(next) : padRows([]);
-    });
+    if (index < 0) return;
+    setRows((prev) => prev.filter((_, i) => i !== index));
+    setActiveRow(-1);
   }, []);
-
-  const filledRows = rows.filter((r) => r.itemId);
 
   const handleSave = useCallback(async () => {
     if (!party || !date) {
@@ -145,17 +147,7 @@ const PriceListMaster = ({ open, onClose, selected }) => {
       return;
     }
 
-    const unmatched = rows.filter((r) => r.name.trim() && !r.itemId);
-    if (unmatched.length) {
-      alert(
-        `These item names are not in the item master:\n\n${unmatched
-          .map((r) => `• ${r.name}`)
-          .join('\n')}\n\nPick them from the list, or add them under Items first.`
-      );
-      return;
-    }
-
-    if (!filledRows.length) {
+    if (!rows.length) {
       alert('Add at least one item.');
       return;
     }
@@ -165,15 +157,13 @@ const PriceListMaster = ({ open, onClose, selected }) => {
       party,
       date,
       remark: remark.trim(),
-      items: filledRows.map((r) => ({
+      items: rows.map((r) => ({
         itemId: r.itemId,
         name: r.name,
         unit: r.unit,
         salePrice: r.salePrice,
         mrp: r.mrp,
-        dis1: r.dis1,
-        dis2: r.dis2,
-        dis3: r.dis3,
+        discount: r.discount,
       })),
     };
 
@@ -196,33 +186,29 @@ const PriceListMaster = ({ open, onClose, selected }) => {
     } finally {
       setSaving(false);
     }
-  }, [party, date, remark, rows, filledRows, isEditing, selected, onClose]);
+  }, [party, date, remark, rows, isEditing, selected, onClose]);
 
-  // The shortcuts printed along the bottom of the old screen, kept so muscle
-  // memory carries over.
+  // Alt+A jumps to the item picker, Alt+S saves, Alt+E removes the row in focus.
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
       if (!e.altKey) return;
       const key = e.key.toLowerCase();
-      if (key === 'a') { e.preventDefault(); addRow(); }
+      if (key === 'a') { e.preventDefault(); pickRef.current?.focus(); }
       if (key === 's') { e.preventDefault(); handleSave(); }
       if (key === 'e') { e.preventDefault(); deleteRow(activeRow); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, addRow, deleteRow, handleSave, activeRow]);
+  }, [open, deleteRow, handleSave, activeRow]);
 
-  /** Enter moves down the same column, like a spreadsheet. */
+  /** Enter moves down the same column; off the last row it returns to the picker. */
   const onCellKeyDown = (e, index, field) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    if (index === rows.length - 1) addRow();
-    requestAnimationFrame(() => {
-      gridRef.current
-        ?.querySelector(`[data-cell="${index + 1}:${field}"]`)
-        ?.focus();
-    });
+    const below = gridRef.current?.querySelector(`[data-cell="${index + 1}:${field}"]`);
+    if (below) below.focus();
+    else pickRef.current?.focus();
   };
 
   return (
@@ -269,11 +255,31 @@ const PriceListMaster = ({ open, onClose, selected }) => {
           </div>
         </div>
 
+        {/* Item picker */}
         <datalist id="price-list-items">
-          {items.map((it) => (
+          {pickable.map((it) => (
             <option value={it.name} key={it._id} />
           ))}
         </datalist>
+        <div className="flex items-end gap-2">
+          <div className="field flex-1">
+            <label className="field-label mb-1.5 block">Add Item</label>
+            <input
+              ref={pickRef}
+              list="price-list-items"
+              className="field-input w-full"
+              placeholder="Type or pick an item, then press Enter"
+              value={pick}
+              onChange={(e) => setPick(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+              }}
+            />
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={addItem}>
+            Add <span className="ml-1 opacity-60">Alt+A</span>
+          </button>
+        </div>
 
         {/* The grid */}
         <div className="table-wrap max-h-[48vh] overflow-auto" ref={gridRef}>
@@ -285,17 +291,21 @@ const PriceListMaster = ({ open, onClose, selected }) => {
                 <th className="w-24">Unit</th>
                 <th className="w-28 text-right">Sale Price</th>
                 <th className="w-28 text-right">MRP</th>
-                <th className="w-20 text-right">Dis 1 %</th>
-                <th className="w-20 text-right">Dis 2 %</th>
-                <th className="w-20 text-right">Dis 3 %</th>
+                <th className="w-24 text-right">Discount %</th>
                 <th className="w-28 text-right">Net Rate</th>
                 <th className="w-10" />
               </tr>
             </thead>
             <tbody>
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-6 text-center text-muted-foreground">
+                    No items yet. Add one from the picker above.
+                  </td>
+                </tr>
+              )}
               {rows.map((row, i) => {
-                const chain = cascadeDiscount(row.dis1, row.dis2, row.dis3);
-                const net = netRate(row.salePrice, row.dis1, row.dis2, row.dis3);
+                const net = netRate(row.salePrice, row.discount);
                 const priced = row.salePrice !== '';
                 return (
                   <tr
@@ -304,17 +314,7 @@ const PriceListMaster = ({ open, onClose, selected }) => {
                     className={i === activeRow ? 'bg-accent/40' : undefined}
                   >
                     <td className="num text-center text-muted-foreground">{i + 1}</td>
-                    <td>
-                      <input
-                        list="price-list-items"
-                        data-cell={`${i}:name`}
-                        className="field-input field-input-sm w-full"
-                        placeholder="Type or pick an item"
-                        value={row.name}
-                        onChange={(e) => chooseItem(i, e.target.value)}
-                        onKeyDown={(e) => onCellKeyDown(e, i, 'name')}
-                      />
-                    </td>
+                    <td className="font-medium">{row.name}</td>
                     <td>
                       <input
                         data-cell={`${i}:unit`}
@@ -324,12 +324,12 @@ const PriceListMaster = ({ open, onClose, selected }) => {
                         onKeyDown={(e) => onCellKeyDown(e, i, 'unit')}
                       />
                     </td>
-                    {['salePrice', 'mrp', 'dis1', 'dis2', 'dis3'].map((field) => (
+                    {['salePrice', 'mrp', 'discount'].map((field) => (
                       <td key={field}>
                         <input
                           type="number"
                           min="0"
-                          max={field.startsWith('dis') ? '100' : undefined}
+                          max={field === 'discount' ? '100' : undefined}
                           step="0.01"
                           data-cell={`${i}:${field}`}
                           className="field-input field-input-sm num w-full text-right"
@@ -341,24 +341,18 @@ const PriceListMaster = ({ open, onClose, selected }) => {
                       </td>
                     ))}
                     <td className="num text-right font-medium">
-                      {row.itemId && priced ? net.toFixed(2) : ''}
-                      {chain > 0 && row.itemId && priced && (
-                        <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                          ({chain.toFixed(2)}%)
-                        </span>
-                      )}
+                      {priced ? net.toFixed(2) : ''}
                     </td>
                     <td className="text-center">
-                      {row.itemId && (
-                        <button
-                          type="button"
-                          title="Delete item (Alt+E)"
-                          className="text-destructive hover:opacity-70"
-                          onClick={() => deleteRow(i)}
-                        >
-                          ×
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        title="Remove item (Alt+E)"
+                        aria-label={`Remove ${row.name}`}
+                        className="text-destructive hover:opacity-70"
+                        onClick={() => deleteRow(i)}
+                      >
+                        ×
+                      </button>
                     </td>
                   </tr>
                 );
@@ -369,13 +363,10 @@ const PriceListMaster = ({ open, onClose, selected }) => {
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-xs text-muted-foreground">
-            {filledRows.length} item{filledRows.length === 1 ? '' : 's'}. Discounts apply one
-            after another, not added up. A blank Sale Price bills at the item master rate.
+            {rows.length} item{rows.length === 1 ? '' : 's'}. A blank Sale Price
+            bills at the item master rate.
           </p>
           <div className="flex items-center gap-2">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={addRow}>
-              Add New <span className="ml-1 opacity-60">Alt+A</span>
-            </button>
             <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>
               Exit
             </button>

@@ -3,21 +3,21 @@
  *
  *   node scripts/price-list.test.mjs
  *
- * The discount chain is the thing worth pinning down: three percentages that
- * apply one after another are not the same as three percentages added up, and
- * the difference lands straight on a customer's invoice. Everything else here
- * guards the fallback rules -- which figure wins when the list has one and the
- * item master has another.
+ * A row carries ONE discount, like an invoice line. Lists saved when the
+ * screen had three successive discounts must keep billing what they billed,
+ * so their chain is collapsed -- not added up. Everything else here guards
+ * the fallback rules -- which figure wins when the list has one and the item
+ * master has another.
  */
 
 import assert from "node:assert/strict";
 import {
-  cascadeDiscount,
   cleanPriceListItems,
   netRate,
   priceListLabel,
   resolveItemPricing,
   resolveItemRate,
+  rowDiscount,
   latestPriceListFor,
 } from "../lib/priceList.mjs";
 
@@ -36,47 +36,35 @@ const test = (name, fn) => {
 const ITEM = { _id: "item1", name: "Angle Valve", unit: "PCS", salePrice: 100, mrp: 150, discount: 4 };
 const listWith = (row) => ({ items: [{ itemId: "item1", ...row }] });
 
-console.log("\n--- the discount chain ---");
+console.log("\n--- the discount ---");
 
-test("three discounts apply one after another, not added up", () => {
+test("the discount comes off the rate", () => {
+  assert.equal(netRate(100, 10), 90);
+  assert.equal(netRate(250.75, 0), 250.75);
+  assert.equal(netRate(100, ""), 100);
+});
+
+test("the discount can never take more than the whole amount", () => {
+  assert.equal(netRate(100, 100), 0);
+  assert.equal(netRate(100, 150), 0, "over 100% is capped");
+  assert.equal(netRate(100, -10), 100, "a negative discount must not inflate the rate");
+});
+
+test("a row's discount is read as one figure", () => {
+  assert.equal(rowDiscount({ discount: 12.5 }), 12.5);
+  assert.equal(rowDiscount({ discount: "" }), 0);
+  assert.equal(rowDiscount(null), 0);
+});
+
+test("an old three-discount row collapses into one, not added up", () => {
   // 100 -> 90 -> 85.50 -> 83.79, an effective 16.21%. Added up it would be 17%.
-  assert.equal(cascadeDiscount(10, 5, 2), 16.21);
-  assert.notEqual(cascadeDiscount(10, 5, 2), 17);
-  assert.equal(netRate(100, 10, 5, 2), 83.79);
+  assert.equal(rowDiscount({ dis1: 10, dis2: 5, dis3: 2 }), 16.21);
+  assert.equal(rowDiscount({ dis1: 10, dis2: 0, dis3: 0 }), 10);
+  assert.equal(rowDiscount({ dis1: 100, dis2: 50, dis3: 50 }), 100);
 });
 
-test("one discount behaves like a plain discount", () => {
-  assert.equal(cascadeDiscount(10, 0, 0), 10);
-  assert.equal(netRate(100, 10, 0, 0), 90);
-});
-
-test("no discounts leave the rate alone", () => {
-  assert.equal(cascadeDiscount(0, 0, 0), 0);
-  assert.equal(netRate(250.75, 0, 0, 0), 250.75);
-});
-
-test("the chain can never take more than the whole amount", () => {
-  assert.equal(cascadeDiscount(100, 50, 50), 100);
-  assert.equal(netRate(100, 100, 50, 50), 0);
-  assert.ok(netRate(100, 90, 90, 90) >= 0);
-});
-
-test("nonsense percentages are ignored rather than inverting the rate", () => {
-  assert.equal(cascadeDiscount(-10, 0, 0), 0, "a negative discount must not inflate the rate");
-  assert.equal(cascadeDiscount(150, 0, 0), 100, "over 100% is capped");
-  assert.equal(cascadeDiscount("", null, undefined), 0);
-});
-
-test("the printed percentage reconciles with the printed amount", () => {
-  // The line carries ONE rounded percentage, so the amount has to follow from
-  // that rounded figure -- otherwise the invoice fails to foot by a paisa.
-  for (const [d1, d2, d3] of [[10, 5, 2], [7.5, 3.25, 1], [33.33, 10, 5], [12, 0, 0]]) {
-    const rate = 1000;
-    const pct = cascadeDiscount(d1, d2, d3);
-    const net = netRate(rate, d1, d2, d3);
-    assert.equal(net, Math.round((rate - (rate * pct) / 100) * 100) / 100,
-      `${d1}/${d2}/${d3}: ${net} does not follow from ${pct}%`);
-  }
+test("a row's own discount wins over any leftover old chain", () => {
+  assert.equal(rowDiscount({ discount: 5, dis1: 10, dis2: 5, dis3: 2 }), 5);
 });
 
 console.log("\n--- which figure wins ---");
@@ -93,13 +81,18 @@ test("a blank listed rate falls back to the master, and 0 does not", () => {
     "an item priced at zero is free, not unpriced");
 });
 
-test("a row with only discounts still bills at the master rate", () => {
-  const p = resolveItemPricing(ITEM, listWith({ salePrice: null, dis1: 10, dis2: 5, dis3: 2 }));
+test("a row with only a discount still bills at the master rate", () => {
+  const p = resolveItemPricing(ITEM, listWith({ salePrice: null, discount: 10 }));
   assert.equal(p.rate, 100);
+  assert.equal(p.discount, 10);
+});
+
+test("an old three-discount row still bills its collapsed discount", () => {
+  const p = resolveItemPricing(ITEM, listWith({ salePrice: 100, dis1: 10, dis2: 5, dis3: 2 }));
   assert.equal(p.discount, 16.21);
 });
 
-test("a row with no discounts keeps the master's discount", () => {
+test("a row with no discount keeps the master's discount", () => {
   const p = resolveItemPricing(ITEM, listWith({ salePrice: 88 }));
   assert.equal(p.discount, 4, "the item master's own discount should carry through");
 });
@@ -129,7 +122,7 @@ test("blank rows and rows with no item are dropped", () => {
   const rows = cleanPriceListItems([
     { itemId: "a", name: "A", salePrice: 10 },
     { itemId: "", name: "typed but never picked", salePrice: 99 },
-    { itemId: "b", name: "B", salePrice: "", mrp: "", dis1: "", dis2: "", dis3: "", unit: "" },
+    { itemId: "b", name: "B", salePrice: "", mrp: "", discount: "", unit: "" },
     null,
   ]);
   assert.equal(rows.length, 1);
@@ -137,10 +130,10 @@ test("blank rows and rows with no item are dropped", () => {
 });
 
 test("a row carrying only a discount is kept", () => {
-  const rows = cleanPriceListItems([{ itemId: "a", name: "A", salePrice: "", dis1: 5 }]);
+  const rows = cleanPriceListItems([{ itemId: "a", name: "A", salePrice: "", discount: 5 }]);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].salePrice, null, "blank stays blank, meaning 'use the master'");
-  assert.equal(rows[0].dis1, 5);
+  assert.equal(rows[0].discount, 5);
 });
 
 test("the same item twice keeps only the first row", () => {
@@ -152,9 +145,19 @@ test("the same item twice keeps only the first row", () => {
   assert.equal(rows[0].salePrice, 10);
 });
 
-test("stored discounts are clamped to something sane", () => {
-  const [row] = cleanPriceListItems([{ itemId: "a", salePrice: 10, dis1: -5, dis2: 150, dis3: "x" }]);
-  assert.deepEqual([row.dis1, row.dis2, row.dis3], [0, 100, 0]);
+test("the stored discount is clamped to something sane", () => {
+  const rows = cleanPriceListItems([
+    { itemId: "a", salePrice: 10, discount: -5 },
+    { itemId: "b", salePrice: 10, discount: 150 },
+    { itemId: "c", salePrice: 10, discount: "x" },
+  ]);
+  assert.deepEqual(rows.map((r) => r.discount), [0, 100, 0]);
+});
+
+test("only the single discount is stored; an old chain sent in is collapsed", () => {
+  const [row] = cleanPriceListItems([{ itemId: "a", salePrice: 10, dis1: 10, dis2: 5, dis3: 2 }]);
+  assert.equal(row.discount, 16.21);
+  assert.equal("dis1" in row || "dis2" in row || "dis3" in row, false);
 });
 
 test("negative and non-numeric rates are not stored", () => {
