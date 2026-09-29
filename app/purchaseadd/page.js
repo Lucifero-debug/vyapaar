@@ -5,7 +5,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { saveToLocal, getFromLocal, clearInvoiceDraft } from '@/lib/localStorageHelper'
 import InvoiceSearchParams from '@/components/suspense';
 import { useSaleOptions } from '@/context/SaleOptionContext';
-import { resolveItemPricing, priceListLabel, latestPriceListFor } from '@/lib/priceList.mjs';
+import { resolveItemPricing, latestPriceListFor } from '@/lib/priceList.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,8 +64,6 @@ const [noOfPack, setNoOfPack] = useState(0);
     const [newTaxName, setNewTaxName] = useState('')
     const [newTaxRate, setNewTaxRate] = useState('')
     const [priceLists, setPriceLists] = useState([])
-    // '' means rates come from the item master
-    const [priceListId, setPriceListId] = useState('')
 
     const formatDate = (dateString) => {
         return new Date(dateString).toISOString().substring(0, 10)
@@ -391,12 +389,16 @@ const addPartyTax = () => {
     };
 
     // ─── Helper: build a new item object from source item + overrides ─────────
-    // Rate AND discount for a newly added line. The party's price list wins
-    // where it has a figure, the item master fills the rest. Its three discount
-    // columns apply one after another, and reach the line as the single
+    // Rate AND discount for a newly added line. When Setup turns price lists
+    // on, the party's latest price list wins where it has a figure, the item
+    // master fills the rest. Its three discount columns apply one after
+    // another, and reach the line as the single
     // percentage an invoice carries -- see lib/priceList.mjs.
     const defaultPricing = (sourceItem) =>
-        resolveItemPricing(sourceItem, priceLists.find((pl) => pl._id === priceListId) || null);
+        resolveItemPricing(
+            sourceItem,
+            options.usePriceList ? latestPriceListFor(priceLists, selectedCustomer?._id) : null
+        );
 
     const buildNewItem = (sourceItem, overrides = {}) => {
         const merged = { ...sourceItem, ...overrides };
@@ -647,8 +649,6 @@ const handleDispatchSave = () => {
                                 const selectedName = e.target.value;
                                 const customers = customer.find(cust => cust.name === selectedName);
                                 setSelectedCustomer(customers || {});
-                                // Default to the party's latest price list; still changeable below
-                                setPriceListId(latestPriceListFor(priceLists, customers?._id)?._id || '');
                             }} 
                             className='field-select'
                         >
@@ -697,21 +697,6 @@ const handleDispatchSave = () => {
                                 onChange={handleTaxTypeChange} 
                             />
                         </div>
-                    </div>
-
-                    {/* Price source */}
-                    <div className='flex flex-col'>
-                        <label className='field-label mb-1'>Price From</label>
-                        <select
-                            value={priceListId}
-                            onChange={(e) => setPriceListId(e.target.value)}
-                            className='field-select'
-                        >
-                            <option value=''>Item Master</option>
-                            {priceLists.map((pl) => (
-                                <option value={pl._id} key={pl._id}>{priceListLabel(pl)}</option>
-                            ))}
-                        </select>
                     </div>
 
                     {/* Item Dropdown */}

@@ -53,6 +53,7 @@ const Page = () => {
     dispatch: 'Dispatch From',
     calculateByPack: 'Enable Quantity = Per Pack × No. of Packs', 
      rollStationary: 'Use Roll Stationary Invoice Format',
+    usePriceList: "Take Rates from Party's Price List",
   };
 
   return (
@@ -78,7 +79,7 @@ const Page = () => {
               <input
                 type="checkbox"
                 name={key}
-                checked={options[key]}
+                checked={!!options[key]}
                 onChange={handleChange}
                 className="field-check"
               />

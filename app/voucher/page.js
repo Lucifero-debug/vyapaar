@@ -98,7 +98,7 @@ export default function VoucherPage() {
   return (
     <div className="page-shell">
       <div className="doc-head">
-        <h2 className="doc-org">DURGA HARDWARE</h2>
+        <h2 className="doc-org">SURYAVANSH TEXTILES</h2>
         <p className="doc-meta">Every posting, in the order it was made</p>
         <p className="doc-kind">Voucher Register</p>
       </div>

@@ -83,7 +83,7 @@ const headCell = 'text-[11px] font-semibold uppercase tracking-wide text-gray-70
               <h1 className="text-xl font-extrabold tracking-wide text-gray-800 sm:text-3xl">Prashant Enterprise</h1>
               <p className="mt-1 text-xs text-gray-600 sm:text-sm">GSTIN: 12ABCDE3456F7Z8</p>
               <p className="mt-1 flex items-center gap-1 text-xs text-gray-700 sm:text-sm">
-                <AddIcCallOutlinedIcon fontSize="small" /> +91 87007 23774
+                <AddIcCallOutlinedIcon fontSize="small" /> +91 76543 21098
               </p>
             </div>
             <div className="ml-auto h-14 w-14 flex-shrink-0 overflow-hidden rounded-full border border-gray-300 shadow-md sm:ml-0 sm:h-20 sm:w-20">

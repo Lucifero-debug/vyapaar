@@ -110,7 +110,7 @@ if (data.all) {
       <div className="page-shell">
         {/* Header */}
         <div className="doc-head">
-          <h2 className="doc-org">DURGA HARDWARE</h2>
+          <h2 className="doc-org">SURYAVANSH TEXTILES</h2>
           <p className="doc-meta">
             LIG FLATS NO.68, IIIIRD FLOOR, SARITA VIHAR, NEW DELHI-110076
           </p>

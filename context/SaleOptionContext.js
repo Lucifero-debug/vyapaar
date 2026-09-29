@@ -11,12 +11,14 @@ export const SaleOptionProvider = ({ children }) => {
     dispatch: false,
      calculateByPack: false,
       rollStationary: false, 
+    usePriceList: true,
   });
 
   useEffect(() => {
     const storedOptions = localStorage.getItem('saleOptions');
     if (storedOptions) {
-      setOptions(JSON.parse(storedOptions));
+      // Merge so options added since this browser last saved keep their default
+      setOptions((prev) => ({ ...prev, ...JSON.parse(storedOptions) }));
     }
   }, []);
 
