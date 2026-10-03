@@ -7,6 +7,7 @@ import InvoiceSearchParams from '@/components/suspense';
 import { useSaleOptions } from '@/context/SaleOptionContext';
 import { resolveItemPricing, latestPriceListFor } from '@/lib/priceList.mjs';
 import { normalizeStateCode } from '@/lib/states.mjs';
+import PartyBalance from '@/components/PartyBalance';
 
 export const dynamic = 'force-dynamic';
 
@@ -671,6 +672,10 @@ const handleDispatchSave = () => {
                                 <option value={cust.name} key={cust.id}>{cust.name}</option>
                             ))}
                         </select>
+                        {/* What this party already owes, read off the master --
+                            not off `selectedCustomer`, which is only a snapshot
+                            when an existing invoice is being edited. */}
+                        <PartyBalance selected={selectedCustomer} customers={customer} />
                     </div>
 
                     <div className='flex justify-between items-center'>
