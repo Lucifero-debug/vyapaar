@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Item from "../../../models/itemModel";
 import ItemLedger from "../../../models/itemLedgerModel";
 import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
+import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
 
 export async function POST(req) {
     try {
@@ -21,9 +22,10 @@ export async function POST(req) {
             const renamed = nextName !== previousName;
 
             if (renamed) {
-                const clash = await Item.findOne({ name: nextName })
-                    .session(session)
-                    .lean();
+                const clash = await findNameClash(Item, "name", nextName, {
+                    excludeId: itemId,
+                    session,
+                });
                 if (clash) {
                     throw new AbortTransaction(
                         { error: `An item named "${nextName}" already exists.` },

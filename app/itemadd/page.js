@@ -27,17 +27,17 @@ const PageContent = () => {
   const [name, setName] = useState('')
   const [short, setShort] = useState('')
   const [group, setGroup] = useState('')
-  const [openBal, setOpenBal] = useState(0)
-  const [lastBal, setLastBal] = useState(0)
-  const [cost, setCost] = useState(0)
-  const [unit, setUnit] = useState("")
-  const [salePrice, setSalePrice] = useState(0)
+  const [openBal, setOpenBal] = useState('')
+  const [lastBal, setLastBal] = useState('')
+  const [cost, setCost] = useState('')
+  const [unit, setUnit] = useState(0)
+  const [salePrice, setSalePrice] = useState('')
   const [itemType, setItemType] = useState('')
-  const [weight, setWeight] = useState(0)
-  const [mrp, setMrp] = useState(0)
-  const [purchasePrice, setPurchasePrice] = useState(0)
-  const [gst, setGst] = useState(0)
-  const [discount, setDiscount] = useState(0)
+  const [weight, setWeight] = useState('')
+  const [mrp, setMrp] = useState('')
+  const [purchasePrice, setPurchasePrice] = useState('')
+  const [gst, setGst] = useState('')
+  const [discount, setDiscount] = useState('')
   const [id, setId] = useState('')
   const [hsnList, setHsnList] = useState([])
 
@@ -70,17 +70,17 @@ const PageContent = () => {
           setName(data.name || '')
           setShort(data.short || '')
           setGroup(data.group || '')
-          setOpenBal(data.openingQuantity || 0)
-          setLastBal(data.lastQuantity || 0)
-          setCost(data.cost || 0)
-          setUnit(data.unit || "")
-          setSalePrice(data.salePrice || 0)
+          setOpenBal(data.openingQuantity ?? '')
+          setLastBal(data.lastQuantity ?? '')
+          setCost(data.cost ?? '')
+          setUnit(data.unit || 0)
+          setSalePrice(data.salePrice ?? '')
           setItemType(data.itemType || '')
-          setWeight(data.weight || 0)
-          setMrp(data.mrp || 0)
-          setPurchasePrice(data.purchasePrice || 0)
-          setGst(data.gst || 0)
-          setDiscount(data.discount || 0)
+          setWeight(data.weight ?? '')
+          setMrp(data.mrp ?? '')
+          setPurchasePrice(data.purchasePrice ?? '')
+          setGst(data.gst ?? '')
+          setDiscount(data.discount ?? '')
           setId(data._id)
         })
         .catch(error => console.error('Error fetching item data:', error));
@@ -89,22 +89,31 @@ const PageContent = () => {
 
   // 💾 Save (add or alter)
   const handleSave = async () => {
+    // Blank means "not set", and must stay that way: sending 0 is what put a
+    // zero price on every item nobody had got round to pricing. The schema
+    // keeps these as Numbers -- every calculation in the app multiplies them.
+    const numOrNull = (v) => {
+      if (v === '' || v === null || v === undefined) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
     const itemData = {
       name,
       group,
       hsn,
-      cost,
+      cost: numOrNull(cost),
       short,
       unit,
-      salePrice,
+      salePrice: numOrNull(salePrice),
       itemType,
-      weight,
-      mrp,
-      purchasePrice,
-      gst,
-      discount,
-      openBal,
-      lastBal,
+      weight: numOrNull(weight),
+      mrp: numOrNull(mrp),
+      purchasePrice: numOrNull(purchasePrice),
+      gst: numOrNull(gst),
+      discount: numOrNull(discount),
+      openBal: numOrNull(openBal),
+      lastBal: numOrNull(lastBal),
       id,
     };
 
@@ -213,12 +222,12 @@ const PageContent = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>Opening Stock</Label>
-                    <Input type="number" onChange={e => setOpenBal(+e.target.value || 0)} value={openBal} />
+                    <Input type="number" onChange={e => setOpenBal(e.target.value)} value={openBal} />
                   </div>
        
                   <div className="space-y-1">
                     <Label>Last Year Stock</Label>
-                    <Input type="number" onChange={e => setLastBal(+e.target.value || 0)} value={lastBal} />
+                    <Input type="number" onChange={e => setLastBal(e.target.value)} value={lastBal} />
                   </div>
                 </div>
               </CardContent>
@@ -241,7 +250,11 @@ const InputField = ({ label, value, onChange, type = "text", readOnly = false })
       type={type}
       value={value}
       readOnly={readOnly}
-      onChange={e => onChange(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
+      /* The raw text is kept in state, including "" for an empty box. Coercing
+         here with `parseFloat(...) || 0` meant clearing a price snapped it
+         straight back to 0, so every unfilled field was saved as a real zero.
+         The figures are converted once, on save. */
+      onChange={e => onChange(e.target.value)}
     />
   </div>
 );

@@ -49,6 +49,7 @@ import {
   PopoverTrigger,
 } from '../components/ui/popover';
 import HsnMaster from '@/components/HsnMaster';
+import CustomerGroupMaster from '@/components/CustomerGroupMaster';
 import PriceListMaster from '@/components/PriceListMaster';
 import { priceListLabel } from '@/lib/priceList.mjs';
 
@@ -61,6 +62,7 @@ const currency = (n) =>
 const Page = () => {
   const router = useRouter();
   const [showHsnMaster, setShowHsnMaster] = useState(false);
+  const [showGroupMaster, setShowGroupMaster] = useState(false);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [customer, setCustomer] = useState([]);
@@ -79,53 +81,73 @@ const Page = () => {
   const [del, setDel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedHsn, setSelectedHsn] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
   const [priceLists, setPriceLists] = useState([]);
   const [showPriceListMaster, setShowPriceListMaster] = useState(false);
   const [selectedPriceList, setSelectedPriceList] = useState(null);
 
   useEffect(() => {
+    /**
+     * Load one endpoint. Never throws.
+     *
+     * The dashboard used to await all of them together and read the arrays
+     * straight off the response — `custData.customer.map(...)`. One endpoint
+     * answering with an error payload, or simply not existing yet, therefore
+     * took down the ENTIRE home screen with "Failed to fetch data", and the
+     * console said only which property was undefined, not which route sent it.
+     */
+    const loadJson = async (url, pick, fallback = []) => {
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!res.ok || data?.success === false) {
+          console.error(`${url} -> ${res.status}`, data?.error || data?.message || '');
+          return fallback;
+        }
+
+        const value = pick(data);
+        return value === undefined || value === null ? fallback : value;
+      } catch (err) {
+        console.error(`${url} failed:`, err);
+        return fallback;
+      }
+    };
+
     const fetchData = async () => {
       try {
-        const [itemRes, custRes, invRes, hsnRes, voucherRes, priceListRes] = await Promise.all([
-          fetch('/api/get-item'),
-          fetch('/api/get-customer'),
-          fetch('/api/get-invoice'),
-          fetch('/api/get-hsn'),
-          fetch('/api/get-voucher'),
-          fetch('/api/get-price-list'),
-        ]);
-        const [itemData, custData, invData, hsnData, voucherData, priceListData] = await Promise.all([
-          itemRes.json(),
-          custRes.json(),
-          invRes.json(),
-          hsnRes.json(),
-          voucherRes.json(),
-          priceListRes.json(),
-        ]);
+        const [items, customers, invoices, hsnCodes, vouchers, lists, groupList] =
+          await Promise.all([
+            loadJson('/api/get-item', (d) => d.item),
+            loadJson('/api/get-customer', (d) => d.customer),
+            loadJson('/api/get-invoice', (d) => d.invoice),
+            loadJson('/api/get-hsn', (d) => d.hsn),
+            loadJson('/api/get-voucher', (d) => d.voucher),
+            loadJson('/api/get-price-list', (d) => d.priceList),
+            loadJson('/api/get-group', (d) => d.group),
+          ]);
 
         setCustomer(
-          custData.customer.map(cust => ({
+          customers.map(cust => ({
             id: cust._id,
             name: cust.name || cust.customerName || cust._id
-          })) || []
+          }))
         );
 
         setItem(
-          itemData.item.map(it => ({
+          items.map(it => ({
             id: it._id,
             name: it.name || it.itemName || it._id
-          })) || []
+          }))
         );
 
-        setHsn(
-          hsnData.hsn.map(hs => ({
-            ...hs,
-            id: hs._id
-          })) || []
-        );
+        setHsn(hsnCodes.map(hs => ({ ...hs, id: hs._id })));
+
+        setGroups(groupList.map(g => ({ ...g, id: g._id })));
 
         setPriceLists(
-          (priceListData.priceList || []).map(pl => ({
+          lists.map(pl => ({
             ...pl,
             id: pl._id,
             name: priceListLabel(pl)
@@ -133,37 +155,39 @@ const Page = () => {
         );
 
         setBank(
-          voucherData.voucher.filter(v => v.paymentType === 'Bank').map(v => ({
+          vouchers.filter(v => v.paymentType === 'Bank').map(v => ({
             id: v._id,
             name: v.acName || v.accountName || v._id
-          })) || []
+          }))
         );
 
         setCash(
-          voucherData.voucher.filter(v => v.paymentType === 'Cash').map(v => ({
+          vouchers.filter(v => v.paymentType === 'Cash').map(v => ({
             id: v._id,
             name: v.acName || v.accountName || v._id
-          })) || []
+          }))
         );
 
-        // Categorize invoices
-        const invoices = invData.invoice || [];
+        // Categorize invoices. `customer` is optional on the invoice schema, so
+        // a bill saved without one must not take the whole dashboard down.
+        const named = (inv) => inv.customer?.name || '—';
+
         const saleInv = invoices.filter(inv => inv.type === 'Sale' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
           totalAmount: inv.totalAmount || 0,
-          customer: inv.customer.name
+          customer: named(inv)
         }));
         const purchaseInv = invoices.filter(inv => inv.type === 'Purchase' && !inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
-          customer: inv.customer.name
+          customer: named(inv)
         }));
         const saleRet = invoices.filter(inv => inv.type === 'Sale' && inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
-          customer: inv.customer.name
+          customer: named(inv)
         }));
         const purchaseRet = invoices.filter(inv => inv.type === 'Purchase' && inv.return).map(inv => ({
           invoiceNo: inv.invoiceNo || inv.id,
-          customer: inv.customer.name
+          customer: named(inv)
         }));
         const totalSales = saleInv.reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) || 0), 0);
 
@@ -173,8 +197,10 @@ const Page = () => {
         setSaleReturns(saleRet);
         setPurchaseReturns(purchaseRet);
       } catch (error) {
-        console.error('Error fetching data:', error);
-        alert('Failed to fetch data.');
+        // Each endpoint already degrades on its own, so reaching here means
+        // something in the shaping above broke. Say so, and name it.
+        console.error('Error building the dashboard:', error);
+        alert(`Could not build the dashboard.\n\n${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -212,6 +238,14 @@ const Page = () => {
           if (selected) {
             setSelectedHsn(selected);
             setShowHsnMaster(true);
+          }
+          break;
+        }
+        case 'CustomerGroup': {
+          const selected = groups.find(g => g.id === newValue);
+          if (selected) {
+            setSelectedGroup(selected);
+            setShowGroupMaster(true);
           }
           break;
         }
@@ -253,6 +287,9 @@ const Page = () => {
         break;
       case 'HSN':
         endpoint = `/api/delete-hsn?id=${currentValue}`;
+        break;
+      case 'CustomerGroup':
+        endpoint = `/api/delete-group?id=${currentValue}`;
         break;
       case 'PriceList':
         endpoint = `/api/delete-price-list?id=${currentValue}`;
@@ -315,6 +352,7 @@ const Page = () => {
       case 'Customer': return customer;
       case 'Item': return item;
       case 'HSN': return hsn;
+      case 'CustomerGroup': return groups;
       case 'PriceList': return priceLists;
       case 'Bank': return bank;
       case 'Cash': return cash;
@@ -329,6 +367,7 @@ const Page = () => {
   const isNamed = (sectionName) =>
     sectionName === 'Customer' ||
     sectionName === 'Item' ||
+    sectionName === 'CustomerGroup' ||
     sectionName === 'PriceList' ||
     sectionName === 'Bank' ||
     sectionName === 'Cash';
@@ -681,6 +720,16 @@ const Page = () => {
               },
             })}
             {renderModuleRow({
+              section: "CustomerGroup",
+              label: "Customer Groups",
+              icon: Users,
+              count: groups.length,
+              onCreate: () => {
+                setSelectedGroup(null);
+                setShowGroupMaster(true);
+              },
+            })}
+            {renderModuleRow({
               section: "PriceList",
               label: "Price Lists",
               icon: Tags,
@@ -790,6 +839,18 @@ const Page = () => {
             if (saved === true) window.location.reload();
           }}
           selected={selectedHsn}
+        />
+      )}
+
+      {showGroupMaster && (
+        <CustomerGroupMaster
+          open={showGroupMaster}
+          onClose={(saved) => {
+            setShowGroupMaster(false);
+            setSelectedGroup(null);
+            if (saved === true) window.location.reload();
+          }}
+          selected={selectedGroup}
         />
       )}
 

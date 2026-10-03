@@ -23,6 +23,7 @@ const PageContent = () => {
   const [name, setName] = useState('');
   const [short, setShort] = useState('');
   const [group, setGroup] = useState('');
+  const [groups, setGroups] = useState([]);
   const [openBal, setOpenBal] = useState(0);
   const [openingMode,setOpeningMode] = useState('')
   const [lastMode,setLastMode] = useState('')
@@ -30,8 +31,8 @@ const PageContent = () => {
   const [running, setRunning] = useState(null)
   const [lastBal, setLastBal] = useState(0);
   const [address, setAddress] = useState('');
-  const [pincode, setPincode] = useState(0);
-  const [phone, setPhone] = useState(0);
+  const [pincode, setPincode] = useState('');
+  const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [gstIn, setGstIn] = useState('');
@@ -41,8 +42,19 @@ const PageContent = () => {
   const [pan, setPan] = useState('');
   const [dealerType,setDealerType] =useState("")
   const [bank, setBank] = useState('');
-  const [interest, setInterest] = useState(0);
-  const [discount, setDiscount] = useState(0);
+  const [interest, setInterest] = useState('');
+  const [discount, setDiscount] = useState('');
+
+  // The Group field picks from the master, so the same group is not typed
+  // three slightly different ways -- which matters because customers are filed
+  // under the group's NAME and invoices resolve their cash and bank accounts
+  // by it.
+  useEffect(() => {
+    fetch('/api/get-group')
+      .then((res) => res.json())
+      .then((data) => setGroups(data.group || []))
+      .catch((err) => console.error('Error fetching customer groups:', err));
+  }, []);
 
   useEffect(() => {
     if (value) {
@@ -68,8 +80,8 @@ const PageContent = () => {
           setLastBal(lastYear.amount);
           setRunning(toDisplay(d.lastBal));
           setAddress(d.address || '');
-          setPincode(d.pincode || 0);
-          setPhone(d.phone ?? null);
+          setPincode(d.pincode ?? '');
+          setPhone(d.phone ?? '');
           setCity(d.city || '');
           setState(d.state || '');
           setGstIn(d.gstIn || '');
@@ -78,8 +90,8 @@ const PageContent = () => {
           setAadhar(d.aadhar || '');
           setPan(d.pan || '');
           setBank(d.bank || 0);
-          setInterest(d.interest || 0);
-          setDiscount(d.discount || 0);
+          setInterest(d.interest ?? '');
+          setDiscount(d.discount ?? '');
           setDealerType(d.dealerType || '')
           setOpeningMode(opening.mode);
           setLastMode(lastYear.mode)
@@ -89,10 +101,21 @@ const PageContent = () => {
   }, [value]);
 
   const handleSave = async () => {
+    // Blank means "not set". Sending 0 is what gave every party a 0% discount
+    // and a 0% interest rate they never asked for. The schema keeps these as
+    // Numbers -- a rate is arithmetic, not a label.
+    const numOrNull = (v) => {
+      if (v === '' || v === null || v === undefined) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
     const customerData = {
       id: id || undefined,
       name, short, group, openBal, lastBal, address, pincode, phone,
-      city, state, gstIn, stateCode, email, aadhar, pan, bank, interest, discount,openingMode,lastMode,dealerType
+      city, state, gstIn, stateCode, email, aadhar, pan, bank,
+      interest: numOrNull(interest), discount: numOrNull(discount),
+      openingMode, lastMode, dealerType
     };
 
     const endpoint = value ? '/api/customer-alter' : '/api/customer-add';
@@ -166,7 +189,23 @@ const PageContent = () => {
             </div>
             <div className="space-y-1">
               <Label htmlFor="group">Group</Label>
-              <Input id="group" value={group} onChange={e => setGroup(e.target.value)} />
+              <select
+                id="group"
+                className="field-select"
+                value={group}
+                onChange={e => setGroup(e.target.value)}
+              >
+                <option value="">Select Group</option>
+                {groups.map((g) => (
+                  <option value={g.name} key={g._id}>{g.name}</option>
+                ))}
+                {/* A party saved before the master existed may be in a group
+                    that is not on the list. Offer it so opening the form does
+                    not silently move them out of it. */}
+                {group && !groups.some((g) => g.name === group) && (
+                  <option value={group}>{group} (not in master)</option>
+                )}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -235,9 +274,9 @@ const PageContent = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {[
                 { label: 'Address', val: address, fn: setAddress, type: 'text' },
-                { label: 'Pincode', val: pincode, fn: setPincode, type: 'number' },
+                { label: 'Pincode', val: pincode, fn: (v) => setPincode(v.replace(/\D/g, '').slice(0, 6)), type: 'text', inputMode: 'numeric', placeholder: 'e.g. 110076' },
                 { label: 'City', val: city, fn: setCity, type: 'text' },
-                { label: 'Phone', val: phone, fn: setPhone, type: 'number' },
+                { label: 'Phone', val: phone, fn: setPhone, type: 'tel', inputMode: 'tel', placeholder: 'e.g. +91 98111 22233' },
                 { label: 'GSTIN', val: gstIn, fn: setGstIn, type: 'text' },
                 { label: 'State', val: state, fn: setState, type: 'text' },
                 { label: 'State Code', val: stateCode, fn: (v) => setStateCode(v.replace(/\D/g, '').slice(0, 2)), type: 'text', inputMode: 'numeric', placeholder: 'e.g. 07' },
@@ -245,8 +284,8 @@ const PageContent = () => {
                 { label: 'PAN', val: pan, fn: setPan, type: 'text' },
                 { label: 'Aadhar', val: aadhar, fn: setAadhar, type: 'text' },
                 { label: 'Bank', val: bank, fn: setBank, type: 'text' },
-                { label: 'Discount', val: discount, fn: setDiscount, type: 'number' },
-                { label: 'Interest', val: interest, fn: setInterest, type: 'number' },
+                { label: 'Discount', val: discount, fn: setDiscount, type: 'text', inputMode: 'decimal', placeholder: '%' },
+                { label: 'Interest', val: interest, fn: setInterest, type: 'text', inputMode: 'decimal', placeholder: '%' },
                 { label: 'Dealer Type', val: dealerType, fn: setDealerType, type: 'text' },
               ].map((field, idx) => (
                 <div className="space-y-1" key={idx}>

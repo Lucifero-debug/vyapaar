@@ -6,19 +6,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { netRate, rowDiscount } from '@/lib/priceList.mjs';
+import { netRate } from '@/lib/priceList.mjs';
 
 const today = () => new Date().toISOString().substring(0, 10);
 
-const newKey = () => Math.random().toString(36).slice(2);
+const BLANK_ROWS = 10;
+const emptyRow = () => ({
+  key: Math.random().toString(36).slice(2),
+  itemId: '', name: '', unit: '', salePrice: '', mrp: '', discount: '',
+});
+
+const padRows = (rows) => {
+  const out = [...rows];
+  while (out.length < BLANK_ROWS) out.push(emptyRow());
+  return out;
+};
 
 /**
- * A party's price list: one row per item, with the unit, the rate, the MRP
- * and the discount side by side. Items are added one at a time from the
- * picker above the grid and removed with the × on their row.
+ * A party's price list, entered the way the shop's old software does it: one
+ * row per item, with the unit, the rate, the MRP and the discount side by
+ * side, and blank rows waiting at the bottom.
  *
- * A blank Sale Price means "bill at the item master's rate" -- which is not
- * the same as entering 0.
+ * A blank Sale Price means "bill at the item master's rate", which is not the
+ * same as entering 0 (free). The columns here are the ones the stored row
+ * actually has -- see models/priceListModel.js and lib/priceList.mjs.
  */
 const PriceListMaster = ({ open, onClose, selected }) => {
   const [party, setParty] = useState('');
@@ -26,25 +37,17 @@ const PriceListMaster = ({ open, onClose, selected }) => {
   const [remark, setRemark] = useState('');
   const [parties, setParties] = useState([]);
   const [items, setItems] = useState([]);
-  const [rows, setRows] = useState([]);
-  const [pick, setPick] = useState('');
-  const [activeRow, setActiveRow] = useState(-1);
+  const [rows, setRows] = useState(padRows([]));
+  const [activeRow, setActiveRow] = useState(0);
   const [saving, setSaving] = useState(false);
   const isEditing = Boolean(selected?._id);
   const gridRef = useRef(null);
-  const pickRef = useRef(null);
 
   const itemsByName = useMemo(() => {
     const map = new Map();
     items.forEach((it) => map.set((it.name || '').toLowerCase(), it));
     return map;
   }, [items]);
-
-  // Items already on the list are left out of the picker.
-  const pickable = useMemo(() => {
-    const listed = new Set(rows.map((r) => String(r.itemId)));
-    return items.filter((it) => !listed.has(String(it._id)));
-  }, [items, rows]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,31 +65,30 @@ const PriceListMaster = ({ open, onClose, selected }) => {
 
   useEffect(() => {
     if (!open) return;
-    setPick('');
-    setActiveRow(-1);
 
     if (!selected) {
       setParty('');
       setDate(today());
       setRemark('');
-      setRows([]);
+      setRows(padRows([]));
+      setActiveRow(0);
       return;
     }
 
     setParty(selected.party ? String(selected.party) : '');
     setDate(selected.date ? new Date(selected.date).toISOString().substring(0, 10) : today());
     setRemark(selected.remark || '');
-    setRows((selected.items || []).map((row) => ({
-      key: newKey(),
+    setRows(padRows((selected.items || []).map((row) => ({
+      key: Math.random().toString(36).slice(2),
       itemId: String(row.itemId || ''),
       name: row.name || '',
       unit: row.unit || '',
-      // `price` is what the rate was called before the discount columns existed.
+      // `price` is what the rate was called before the screen grew its columns.
       salePrice: row.salePrice ?? row.price ?? '',
       mrp: row.mrp ?? '',
-      // Lists saved with the old Dis 1/2/3 chain open with it merged into one.
-      discount: rowDiscount(row) || '',
-    })));
+      discount: row.discount ?? '',
+    }))));
+    setActiveRow(0);
   }, [open, selected]);
 
   const setCell = (index, field, value) => {
@@ -97,49 +99,43 @@ const PriceListMaster = ({ open, onClose, selected }) => {
     });
   };
 
-  /** Adds the picked item, seeded from the item master; the user overrides. */
-  const addItem = useCallback(() => {
-    const name = pick.trim();
-    if (!name) {
-      pickRef.current?.focus();
-      return;
-    }
-    const match = itemsByName.get(name.toLowerCase());
-    if (!match) {
-      alert(`"${name}" is not in the item master. Pick it from the list, or add it under Items first.`);
-      return;
-    }
-    if (rows.some((r) => String(r.itemId) === String(match._id))) {
-      alert(`${match.name} is already on this price list.`);
-      return;
-    }
+  /** Picking an item seeds the row from the item master; the user overrides. */
+  const chooseItem = (index, typedName) => {
+    const match = itemsByName.get(typedName.trim().toLowerCase());
+    setRows((prev) => {
+      const next = [...prev];
+      const row = { ...next[index], name: typedName };
 
-    const index = rows.length;
-    setRows((prev) => [
-      ...prev,
-      {
-        key: newKey(),
-        itemId: String(match._id),
-        name: match.name,
-        unit: match.unit || '',
-        salePrice: match.salePrice ?? '',
-        mrp: match.mrp ?? '',
-        discount: match.discount ? String(match.discount) : '',
-      },
-    ]);
-    setPick('');
-    setActiveRow(index);
-    // Straight into the new row's Sale Price, ready to type over.
-    requestAnimationFrame(() => {
-      gridRef.current?.querySelector(`[data-cell="${index}:salePrice"]`)?.select();
+      if (match) {
+        row.itemId = match._id;
+        row.unit = row.unit || match.unit || '';
+        if (row.salePrice === '') row.salePrice = match.salePrice ?? '';
+        if (row.mrp === '') row.mrp = match.mrp ?? '';
+        if (row.discount === '' && match.discount) row.discount = String(match.discount);
+      } else {
+        row.itemId = '';
+      }
+
+      next[index] = row;
+      return next;
     });
-  }, [pick, itemsByName, rows]);
+  };
+
+  const addRow = useCallback(() => {
+    setRows((prev) => {
+      setActiveRow(prev.length);
+      return [...prev, emptyRow()];
+    });
+  }, []);
 
   const deleteRow = useCallback((index) => {
-    if (index < 0) return;
-    setRows((prev) => prev.filter((_, i) => i !== index));
-    setActiveRow(-1);
+    setRows((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return padRows(next);
+    });
   }, []);
+
+  const filledRows = rows.filter((r) => r.itemId);
 
   const handleSave = useCallback(async () => {
     if (!party || !date) {
@@ -147,7 +143,17 @@ const PriceListMaster = ({ open, onClose, selected }) => {
       return;
     }
 
-    if (!rows.length) {
+    const unmatched = rows.filter((r) => r.name.trim() && !r.itemId);
+    if (unmatched.length) {
+      alert(
+        `These item names are not in the item master:\n\n${unmatched
+          .map((r) => `• ${r.name}`)
+          .join('\n')}\n\nPick them from the list, or add them under Items first.`
+      );
+      return;
+    }
+
+    if (!filledRows.length) {
       alert('Add at least one item.');
       return;
     }
@@ -157,7 +163,7 @@ const PriceListMaster = ({ open, onClose, selected }) => {
       party,
       date,
       remark: remark.trim(),
-      items: rows.map((r) => ({
+      items: filledRows.map((r) => ({
         itemId: r.itemId,
         name: r.name,
         unit: r.unit,
@@ -186,29 +192,31 @@ const PriceListMaster = ({ open, onClose, selected }) => {
     } finally {
       setSaving(false);
     }
-  }, [party, date, remark, rows, isEditing, selected, onClose]);
+  }, [party, date, remark, rows, filledRows, isEditing, selected, onClose]);
 
-  // Alt+A jumps to the item picker, Alt+S saves, Alt+E removes the row in focus.
+  // The shortcuts printed along the bottom of the old software's screen, kept
+  // so the shop's muscle memory carries over.
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
       if (!e.altKey) return;
       const key = e.key.toLowerCase();
-      if (key === 'a') { e.preventDefault(); pickRef.current?.focus(); }
+      if (key === 'a') { e.preventDefault(); addRow(); }
       if (key === 's') { e.preventDefault(); handleSave(); }
       if (key === 'e') { e.preventDefault(); deleteRow(activeRow); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, deleteRow, handleSave, activeRow]);
+  }, [open, addRow, deleteRow, handleSave, activeRow]);
 
-  /** Enter moves down the same column; off the last row it returns to the picker. */
+  /** Enter moves down the same column, like a spreadsheet. */
   const onCellKeyDown = (e, index, field) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    const below = gridRef.current?.querySelector(`[data-cell="${index + 1}:${field}"]`);
-    if (below) below.focus();
-    else pickRef.current?.focus();
+    if (index === rows.length - 1) addRow();
+    requestAnimationFrame(() => {
+      gridRef.current?.querySelector(`[data-cell="${index + 1}:${field}"]`)?.focus();
+    });
   };
 
   return (
@@ -220,7 +228,6 @@ const PriceListMaster = ({ open, onClose, selected }) => {
           </DialogTitle>
         </DialogHeader>
 
-        {/* Party / date / remarks */}
         <div className="grid grid-cols-1 gap-4 py-1 sm:grid-cols-3">
           <div className="field sm:col-span-2">
             <label className="field-label mb-1.5 block">Party</label>
@@ -255,33 +262,12 @@ const PriceListMaster = ({ open, onClose, selected }) => {
           </div>
         </div>
 
-        {/* Item picker */}
         <datalist id="price-list-items">
-          {pickable.map((it) => (
+          {items.map((it) => (
             <option value={it.name} key={it._id} />
           ))}
         </datalist>
-        <div className="flex items-end gap-2">
-          <div className="field flex-1">
-            <label className="field-label mb-1.5 block">Add Item</label>
-            <input
-              ref={pickRef}
-              list="price-list-items"
-              className="field-input w-full"
-              placeholder="Type or pick an item, then press Enter"
-              value={pick}
-              onChange={(e) => setPick(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); addItem(); }
-              }}
-            />
-          </div>
-          <button type="button" className="btn btn-secondary" onClick={addItem}>
-            Add <span className="ml-1 opacity-60">Alt+A</span>
-          </button>
-        </div>
 
-        {/* The grid */}
         <div className="table-wrap max-h-[48vh] overflow-auto" ref={gridRef}>
           <table className="data-table text-sm">
             <thead>
@@ -297,16 +283,9 @@ const PriceListMaster = ({ open, onClose, selected }) => {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-6 text-center text-muted-foreground">
-                    No items yet. Add one from the picker above.
-                  </td>
-                </tr>
-              )}
               {rows.map((row, i) => {
-                const net = netRate(row.salePrice, row.discount);
                 const priced = row.salePrice !== '';
+                const net = netRate(row.salePrice, row.discount);
                 return (
                   <tr
                     key={row.key}
@@ -314,7 +293,17 @@ const PriceListMaster = ({ open, onClose, selected }) => {
                     className={i === activeRow ? 'bg-accent/40' : undefined}
                   >
                     <td className="num text-center text-muted-foreground">{i + 1}</td>
-                    <td className="font-medium">{row.name}</td>
+                    <td>
+                      <input
+                        list="price-list-items"
+                        data-cell={`${i}:name`}
+                        className="field-input field-input-sm w-full"
+                        placeholder="Type or pick an item"
+                        value={row.name}
+                        onChange={(e) => chooseItem(i, e.target.value)}
+                        onKeyDown={(e) => onCellKeyDown(e, i, 'name')}
+                      />
+                    </td>
                     <td>
                       <input
                         data-cell={`${i}:unit`}
@@ -341,18 +330,19 @@ const PriceListMaster = ({ open, onClose, selected }) => {
                       </td>
                     ))}
                     <td className="num text-right font-medium">
-                      {priced ? net.toFixed(2) : ''}
+                      {row.itemId && priced ? net.toFixed(2) : ''}
                     </td>
                     <td className="text-center">
-                      <button
-                        type="button"
-                        title="Remove item (Alt+E)"
-                        aria-label={`Remove ${row.name}`}
-                        className="text-destructive hover:opacity-70"
-                        onClick={() => deleteRow(i)}
-                      >
-                        ×
-                      </button>
+                      {row.itemId && (
+                        <button
+                          type="button"
+                          title="Delete item (Alt+E)"
+                          className="text-destructive hover:opacity-70"
+                          onClick={() => deleteRow(i)}
+                        >
+                          ×
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -363,10 +353,13 @@ const PriceListMaster = ({ open, onClose, selected }) => {
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-xs text-muted-foreground">
-            {rows.length} item{rows.length === 1 ? '' : 's'}. A blank Sale Price
-            bills at the item master rate.
+            {filledRows.length} item{filledRows.length === 1 ? '' : 's'}. A blank Sale Price
+            bills at the item master rate; 0 means free.
           </p>
           <div className="flex items-center gap-2">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={addRow}>
+              Add New <span className="ml-1 opacity-60">Alt+A</span>
+            </button>
             <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>
               Exit
             </button>

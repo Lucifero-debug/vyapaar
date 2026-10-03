@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useSaleOptions } from '@/context/SaleOptionContext';
+import { COMPANY } from '@/lib/company.mjs';
 
 const PageContent = () => {
 
@@ -89,6 +90,19 @@ const downloadPDF = async () => {
 
 
   const sendInvoice = async () => {
+    // The bill goes to the party it was raised against. This used to be
+    // hard-coded to one developer's gmail address, so every "email invoice"
+    // click sent the customer's bill to a stranger.
+    const recipient = (invoice?.customer?.email || '').trim();
+
+    if (!recipient) {
+      alert(
+        `No email address on file for ${invoice?.customer?.name || 'this customer'}.\n\n` +
+        `Add one under Customers, then try again.`
+      );
+      return;
+    }
+
     const pdfBase64 = await generatePDF(contentRef);
 
     if (!pdfBase64) {
@@ -100,17 +114,22 @@ const downloadPDF = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        toEmail: "superstrong8700@gmail.com",
-        subject: "Your Invoice from Prashant Enterprise",
+        toEmail: recipient,
+        subject: `Invoice ${invoice?.invoiceNo ?? ''} from ${COMPANY.name}`.trim(),
         htmlContent: "<p>Please find your invoice attached.</p>",
         pdfBase64: pdfBase64.split(",")[1],
+        fileName: `Invoice_${invoice?.invoiceNo ?? 'invoice'}.pdf`,
       }),
     });
 
-    if (response.ok) {
-      alert("Invoice sent successfully!");
+    // The route answers { success } — a 200 alone used to be read as "sent",
+    // which it was not when the provider rejected the message.
+    const result = await response.json().catch(() => ({}));
+
+    if (response.ok && result.success) {
+      alert(`Invoice emailed to ${recipient}.`);
     } else {
-      alert("Failed to send invoice");
+      alert(`Failed to send invoice.\n\n${result.error || 'Please try again.'}`);
     }
   };
   

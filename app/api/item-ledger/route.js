@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { connect } from "@/lib/mongodb";
 import ItemLedger from "@/models/itemLedgerModel";
@@ -10,26 +11,49 @@ export async function GET(req) {
     const itemId = searchParams.get("itemId");
 
     if (!itemId) {
-      return NextResponse.json({ success: false, error: "Item ID is required" });
+      return NextResponse.json(
+        { success: false, error: "Item ID is required" },
+        { status: 400 }
+      );
     }
-if (itemId === "0") {
-  const [items, ledgers] = await Promise.all([
-    Item.find().lean(),
-    ItemLedger.find().sort({ date: 1 }).lean(),
-  ]);
 
-  return NextResponse.json({
-    all: true,
-    items,
-    ledgers,
-  });
-}
+    if (itemId === "0") {
+      const [items, ledgers] = await Promise.all([
+        Item.find().lean(),
+        ItemLedger.find().sort({ date: 1 }).lean(),
+      ]);
 
-    const item = await Item.findById(itemId);
-    const ledgers = await ItemLedger.find({ itemName: item.name }).sort({ date: 1 });
+      return NextResponse.json({ success: true, all: true, items, ledgers });
+    }
+
+    // A malformed id used to throw a CastError out of findById; a valid id for
+    // an item that has since been deleted used to reach `item.name` on null and
+    // crash the route. Both now answer plainly.
+    if (!mongoose.Types.ObjectId.isValid(itemId)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid item id." },
+        { status: 400 }
+      );
+    }
+
+    const item = await Item.findById(itemId).lean();
+    if (!item) {
+      return NextResponse.json(
+        { success: false, error: "Item not found." },
+        { status: 404 }
+      );
+    }
+
+    const ledgers = await ItemLedger.find({ itemName: item.name })
+      .sort({ date: 1 })
+      .lean();
 
     return NextResponse.json({ success: true, item, ledgers });
   } catch (err) {
-    return NextResponse.json({ success: false, error: err.message });
+    console.error("Item ledger error:", err);
+    return NextResponse.json(
+      { success: false, error: err.message },
+      { status: 500 }
+    );
   }
 }

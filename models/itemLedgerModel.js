@@ -37,6 +37,13 @@ const itemLedgerSchema = new mongoose.Schema({
   },
 });
 
+
+// The stock report reads one item's rows in date order, and writing an
+// invoice's stock rows deletes the previous ones by invoice number.
+itemLedgerSchema.index({ itemName: 1, date: 1, _id: 1 });
+itemLedgerSchema.index({ invoiceNo: 1 });
+itemLedgerSchema.index({ partyName: 1 });
+
 const ItemLedger =
   mongoose.models.ItemLedger || mongoose.model("ItemLedger", itemLedgerSchema);
 

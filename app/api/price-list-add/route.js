@@ -18,6 +18,30 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: "Party not found" }, { status: 404 });
     }
 
+    // A price list is identified by its party and its date, so two lists for
+    // the same party on the same day are a duplicate: `latestPriceListFor`
+    // sorts by date and takes the first, which makes the winner arbitrary and
+    // the rate a customer is billed depend on insertion order.
+    const day = new Date(body.date);
+    const dayStart = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()));
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
+    const sameDay = await PriceList.findOne({
+      party: party._id,
+      date: { $gte: dayStart, $lt: dayEnd },
+    }, { _id: 1 }).lean();
+
+    if (sameDay) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `${party.name} already has a price list dated ${dayStart.toISOString().slice(0, 10)}. Edit that one instead of adding a second.`,
+        },
+        { status: 409 }
+      );
+    }
+
     const priceList = await PriceList.create({
       party: party._id,
       partyName: party.name,

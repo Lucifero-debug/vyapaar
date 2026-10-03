@@ -13,7 +13,7 @@
     "export": "next export",
     "migrate:balances": "node scripts/migrate-balances.mjs",
     "migrate:balances:apply": "node scripts/migrate-balances.mjs --apply",
-    "test": "node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/backfill-hsn-totals.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs && node scripts/posting-invariants.test.mjs && node scripts/price-list.test.mjs && node scripts/clear-zero-units.test.mjs",
+    "test": "node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/backfill-hsn-totals.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs && node scripts/posting-invariants.test.mjs && node scripts/price-list.test.mjs && node scripts/clear-zero-units.test.mjs && node scripts/phone-to-string.test.mjs && node scripts/blank-zeros.test.mjs && node scripts/customer-groups.test.mjs && node scripts/unique-name.test.mjs",
     "rebuild:voucher-ledger": "node scripts/rebuild-voucher-ledger.mjs",
     "rebuild:voucher-ledger:apply": "node scripts/rebuild-voucher-ledger.mjs --apply",
     "backfill:hsn-totals": "node scripts/backfill-hsn-totals.mjs",
@@ -21,7 +21,14 @@
     "reset:data": "node scripts/reset-data.mjs",
     "reset:data:apply": "node scripts/reset-data.mjs --apply",
     "clear:zero-units": "node scripts/clear-zero-units.mjs",
-    "clear:zero-units:apply": "node scripts/clear-zero-units.mjs --apply"
+    "migrate:phone": "node scripts/phone-to-string.mjs",
+    "migrate:phone:apply": "node scripts/phone-to-string.mjs --apply",
+    "clear:zero-units:apply": "node scripts/clear-zero-units.mjs --apply",
+    "blank:zeros": "node scripts/blank-zeros.mjs",
+    "blank:zeros:apply": "node scripts/blank-zeros.mjs --apply",
+    "seed:groups": "node scripts/seed-customer-groups.mjs",
+    "seed:groups:apply": "node scripts/seed-customer-groups.mjs --apply",
+    "check:duplicates": "node scripts/check-duplicates.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^7.4.4",

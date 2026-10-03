@@ -258,22 +258,22 @@ const AddVoucher = () => {
                         className="w-full bg-transparent text-sm outline-none focus:ring-0"
                       />
                     </td>
-                    <td className="text-right">
+                    <td>
                       <input
                         type="number"
                         name="debit"
                         value={entry.debit}
                         onChange={(e) => handleEntryChange(index, e)}
-                        className="w-full bg-transparent text-right text-sm tabular-nums outline-none focus:ring-0"
+                        className="field-input field-input-sm num"
                       />
                     </td>
-                    <td className="text-right">
+                    <td>
                       <input
                         type="number"
                         name="credit"
                         value={entry.credit}
                         onChange={(e) => handleEntryChange(index, e)}
-                        className="w-full bg-transparent text-right text-sm tabular-nums outline-none focus:ring-0"
+                        className="field-input field-input-sm num"
                       />
                     </td>
                     <td className="text-center">

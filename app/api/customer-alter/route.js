@@ -7,6 +7,7 @@ import ItemLedger from '../../../models/itemLedgerModel'
 import Voucher from '../../../models/voucherModel'
 import { applyDelta, modeOf, round2, toSigned } from '@/lib/balance.mjs'
 import { withTransaction, AbortTransaction } from '@/lib/withTransaction.mjs'
+import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
 import { normalizeStateCode } from '@/lib/gst.mjs'
 
 export async function POST(req) {
@@ -33,9 +34,10 @@ export async function POST(req) {
             // Merging two parties' history by renaming one onto the other is
             // never what anybody means.
             if (renamed) {
-                const clash = await Customer.findOne({ name: nextName })
-                    .session(session)
-                    .lean();
+                const clash = await findNameClash(Customer, "name", nextName, {
+                    excludeId: customerId,
+                    session,
+                });
                 if (clash) {
                     throw new AbortTransaction(
                         { error: `A customer named "${nextName}" already exists.` },

@@ -1,34 +1,80 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { COMPANY } from "@/lib/company.mjs";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/**
+ * Email an invoice PDF to the party it was raised against.
+ *
+ * `INVOICE_FROM_EMAIL` must be an address on a domain verified with Resend.
+ * Until one is set this falls back to Resend's shared sandbox sender, which
+ * only delivers to the account owner's own address — fine for a demo, useless
+ * for a real customer.
+ */
+const FROM = process.env.INVOICE_FROM_EMAIL
+  ? `${COMPANY.name} <${process.env.INVOICE_FROM_EMAIL}>`
+  : `${COMPANY.name} <onboarding@resend.dev>`;
+
+const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
 export async function POST(req) {
   try {
-    const body = await req.json(); // Parse the JSON body
+    // Missing configuration used to surface as an opaque failure from the
+    // Resend client. Say what is actually wrong.
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json(
+        { success: false, error: "Email is not configured — RESEND_API_KEY is not set." },
+        { status: 503 }
+      );
+    }
 
-    const { toEmail, subject, htmlContent, pdfBase64 } = body;
+    const { toEmail, subject, htmlContent, pdfBase64, fileName } = await req.json();
 
-    const response = await resend.emails.send({
-      from: "Your Company <yourname@resend.dev>",
+    if (!looksLikeEmail(toEmail)) {
+      return NextResponse.json(
+        { success: false, error: "No valid recipient email address." },
+        { status: 400 }
+      );
+    }
+    if (!pdfBase64) {
+      return NextResponse.json(
+        { success: false, error: "No invoice PDF to attach." },
+        { status: 400 }
+      );
+    }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    const { data, error } = await resend.emails.send({
+      from: FROM,
       to: toEmail,
-      subject: subject,
-      html: htmlContent,
+      subject: subject || `Invoice from ${COMPANY.name}`,
+      html: htmlContent || "<p>Please find your invoice attached.</p>",
       attachments: [
         {
-          content: pdfBase64, // The PDF file as a base64 string
-          filename: "invoice.pdf",
+          content: pdfBase64,
+          filename: fileName || "invoice.pdf",
           type: "application/pdf",
           disposition: "attachment",
         },
       ],
     });
-console.log("quit",response)
-    return NextResponse.json({ message: "Email sent successfully", response });
+
+    // Resend answers with { data, error } rather than throwing. That `error`
+    // was ignored, so the route returned 200 and the page cheerfully said
+    // "Invoice sent successfully!" for mail that had never left the building.
+    if (error) {
+      console.error("Resend rejected the message:", error);
+      return NextResponse.json(
+        { success: false, error: error.message || "The email provider rejected the message." },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json({ success: true, id: data?.id, message: "Email sent successfully" });
   } catch (error) {
     console.error("Error sending email:", error);
     return NextResponse.json(
-      { error: "Failed to send email", details: error.message },
+      { success: false, error: error.message || "Failed to send email" },
       { status: 500 }
     );
   }

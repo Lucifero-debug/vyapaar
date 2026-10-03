@@ -3,6 +3,7 @@ import React, { forwardRef } from 'react'
 import { splitGst } from '@/lib/gst.mjs';
 import { buildHsnSummary, hsnGrandTotal, lineTaxable } from '@/lib/hsnTotals.mjs';
 import AddIcCallOutlinedIcon from '@mui/icons-material/AddIcCallOutlined';
+import { COMPANY, companyAddress, has } from '@/lib/company.mjs';
 
 /**
  * One printed invoice. Shared by the single-invoice page and the date-range
@@ -80,14 +81,21 @@ const headCell = 'text-[11px] font-semibold uppercase tracking-wide text-gray-70
         <header className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="min-w-0">
-              <h1 className="text-xl font-extrabold tracking-wide text-gray-800 sm:text-3xl">Prashant Enterprise</h1>
-              <p className="mt-1 text-xs text-gray-600 sm:text-sm">GSTIN: 12ABCDE3456F7Z8</p>
-              <p className="mt-1 flex items-center gap-1 text-xs text-gray-700 sm:text-sm">
-                <AddIcCallOutlinedIcon fontSize="small" /> +91 76543 21098
-              </p>
+              <h1 className="text-xl font-extrabold tracking-wide text-gray-800 sm:text-3xl">{COMPANY.name}</h1>
+              <p className="mt-1 text-xs text-gray-600 sm:text-sm">{companyAddress()}</p>
+              {/* Blank details are not printed — a placeholder GSTIN on a tax
+                  invoice is worse than none. Fill them in lib/company.mjs. */}
+              {has(COMPANY.gstin) && (
+                <p className="mt-1 text-xs text-gray-600 sm:text-sm">GSTIN: {COMPANY.gstin}</p>
+              )}
+              {has(COMPANY.phone) && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-gray-700 sm:text-sm">
+                  <AddIcCallOutlinedIcon fontSize="small" /> {COMPANY.phone}
+                </p>
+              )}
             </div>
             <div className="ml-auto h-14 w-14 flex-shrink-0 overflow-hidden rounded-full border border-gray-300 shadow-md sm:ml-0 sm:h-20 sm:w-20">
-              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
+              <img src={COMPANY.logo} alt={COMPANY.name} className="w-full h-full object-cover" />
             </div>
           </div>
           {/* Phone: number and date sit side by side under the masthead.

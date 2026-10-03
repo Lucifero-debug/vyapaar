@@ -1,53 +1,73 @@
-import { NextResponse } from "next/server";
 import mongoose from "mongoose";
+import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
 import Item from "@/models/itemModel";
 import Invoice from "../../../models/invoiceModel";
-import PriceList from "../../../models/priceListModel";
+import ItemLedger from "../../../models/itemLedgerModel";
 
 export async function POST(req) {
   try {
     await connect();
 
-    const url = new URL(req.url);
-    const id = url.searchParams.get("id"); // still using 'id' param for invoiceNo
+    const id = new URL(req.url).searchParams.get("id");
 
     if (!id) {
       return NextResponse.json({ error: "Id missing in query." }, { status: 400 });
     }
-
-    if (!mongoose.isValidObjectId(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid item id." }, { status: 400 });
     }
 
-        const existingInvoice = await Invoice.findOne({ "items._id": id });
+    const item = await Item.findById(id);
+    if (!item) {
+      return NextResponse.json({ error: "Item not found." }, { status: 404 });
+    }
+
+    // Guard by NAME, which is what the rest of the database joins on.
+    //
+    // This used to look for `Invoice.items._id` — the id of the embedded line,
+    // which only matches when the line was added from the item master on this
+    // form. A line imported from an invoice image carries no master id at all,
+    // so those invoices were invisible to the check and their item could be
+    // deleted out from under them.
+    const existingInvoice = await Invoice.findOne(
+      { "items.name": item.name },
+      { invoiceNo: 1 }
+    ).lean();
 
     if (existingInvoice) {
       return NextResponse.json(
         {
           success: false,
-          message: `Cannot delete item because it is used in invoice #${existingInvoice.invoiceNo}.`,
+          message: `Cannot delete "${item.name}" — it is used in invoice #${existingInvoice.invoiceNo}.`,
           invoiceNo: existingInvoice.invoiceNo,
         },
-        { status: 409 } // Conflict
+        { status: 409 }
+      );
+    }
+
+    // Stock history was never checked at all. An item whose invoices had been
+    // deleted could still be removed, stranding its movements under a name with
+    // no master — and the stock report then counts its opening quantity as 0.
+    const existingStock = await ItemLedger.findOne({ itemName: item.name }, { _id: 1 }).lean();
+
+    if (existingStock) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Cannot delete "${item.name}" — it has stock movements recorded against it.`,
+        },
+        { status: 409 }
       );
     }
 
     const deletedItem = await Item.findByIdAndDelete(id);
-
-    if (!deletedItem) {
-      return NextResponse.json({ error: "Item not found." }, { status: 404 });
-    }
-
-    // Drop the item's rate from every price list so none keeps a dead row.
-    await PriceList.updateMany({}, { $pull: { items: { itemId: deletedItem._id } } });
 
     return NextResponse.json({
       message: "Item deleted successfully",
       success: true,
       deletedItem,
     });
-
   } catch (error) {
     console.error("Delete Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

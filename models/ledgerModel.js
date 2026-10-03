@@ -36,6 +36,15 @@ const ledgerSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+
+// Every ledger report groups by customerName, and `recomputeLedgerBalances`
+// runs a sorted find per account on EVERY save. Unindexed these were full
+// collection scans. voucherId is how an invoice or voucher finds its own rows
+// to delete, which happens on every edit and delete.
+ledgerSchema.index({ customerName: 1, date: 1, _id: 1 });
+ledgerSchema.index({ voucherId: 1 });
+ledgerSchema.index({ account: 1 });
+
 const Ledger = mongoose.models.Ledger || mongoose.model("Ledger", ledgerSchema);
 
 export default Ledger;

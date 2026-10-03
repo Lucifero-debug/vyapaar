@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
+// The invoice-image extraction service (backend/app.py). Hard-coding the
+// deploy URL meant a local backend could never be used and a redeploy to a new
+// host silently broke the import. Set NEXT_PUBLIC_AI_IMPORT_URL to override.
+const AI_IMPORT_URL =
+  process.env.NEXT_PUBLIC_AI_IMPORT_URL || "https://vyapaar-4.onrender.com";
+
 export default function Home() {
 
   const [file, setFile] = useState(null)
@@ -19,7 +25,7 @@ const handleUpload = async () => {
 
   try {
     // 1. Get structured data from FastAPI
-    const res = await fetch("https://vyapaar-4.onrender.com/start", {
+    const res = await fetch(`${AI_IMPORT_URL}/start`, {
       method: "POST",
       body: formData,
     });
@@ -83,13 +89,28 @@ const handleUpload = async () => {
     const result = await saveRes.json();
 
     if (result.success) {
-      // 6. Show the invoice the server actually stored. The number the server
-      //    settled on can differ from the one the extractor read, if that one
-      //    was already taken.
-      const savedNo = result.invoice?.invoiceNo ?? invoiceData.invoiceNo;
+      // 6. Navigate to Invoice view page with URL params (Matches your query logic)
+      const encodedItems = encodeURIComponent(JSON.stringify(invoiceData.items));
+      const encodedParty = encodeURIComponent(JSON.stringify(invoiceData.partyTaxes));
+      const encodedHsnTotals = encodeURIComponent(JSON.stringify(aiInvoice.hsnTotals));
+
+      const query = new URLSearchParams({
+        invoiceNo: invoiceData.invoiceNo,
+        date: invoiceData.date,
+        customer: invoiceData.customer.name,
+        phone: invoiceData.customer.phone,
+        totalAmount: invoiceData.totalAmount,
+        finalAmount: invoiceData.finalAmount,
+        received: invoiceData.received,
+        balanceDue: invoiceData.balanceDue,
+        items: encodedItems,
+        partyTaxes: encodedParty,
+        hsnTotals: encodedHsnTotals,
+        type: "Purchase"
+      }).toString();
 
       alert("Invoice processed and saved successfully! 🚀");
-      router.push(`/invoice?invoiceNo=${savedNo}`);
+      router.push(`/invoice?${query}`);
     } else {
       alert('Failed to save invoice: ' + result.error);
     }

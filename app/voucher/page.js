@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
+import { COMPANY } from '@/lib/company.mjs';
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const formatAmount = (n = 0) => round2(n).toFixed(2);
@@ -98,7 +99,7 @@ export default function VoucherPage() {
   return (
     <div className="page-shell">
       <div className="doc-head">
-        <h2 className="doc-org">SURYAVANSH TEXTILES</h2>
+        <h2 className="doc-org">{COMPANY.name}</h2>
         <p className="doc-meta">Every posting, in the order it was made</p>
         <p className="doc-kind">Voucher Register</p>
       </div>

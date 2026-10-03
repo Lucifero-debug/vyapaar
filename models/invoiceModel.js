@@ -91,4 +91,13 @@ customer: {
   { timestamps: true }
 );
 
+
+// The date-range print filters on date + type; delete-cust and the rename
+// cascade look an invoice up by its party's name. invoiceNo already has a
+// unique index from its field definition.
+invoiceSchema.index({ date: 1, invoiceNo: 1 });
+invoiceSchema.index({ type: 1, return: 1, date: 1 });
+invoiceSchema.index({ "customer.name": 1 });
+invoiceSchema.index({ "items.name": 1 });
+
 export default mongoose.models.Invoice || mongoose.model('Invoice', invoiceSchema);

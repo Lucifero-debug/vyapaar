@@ -2,19 +2,36 @@ import { NextResponse } from "next/server";
 import {connect} from '../../../lib/mongodb'
 import Customer from '../../../models/custModel'
 import { toSigned, modeOf } from '@/lib/balance.mjs'
-import { normalizeStateCode } from '@/lib/gst.mjs'
+import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
 
 
 export async function POST(req) {
     try {
         await connect()
         const customerData = await req.json();
+
+        // Parties are joined BY NAME across the ledger, the stock ledger,
+        // invoices and vouchers. Two parties sharing a name makes both their
+        // ledgers ambiguous for good, so the name is claimed here. (The alter
+        // route has always checked this; creating never did.)
+        const name = (customerData.name || "").trim();
+        if (!name) {
+            return NextResponse.json({ error: "Please enter a name." }, { status: 400 });
+        }
+
+        const clash = await findNameClash(Customer, "name", name);
+        if (clash) {
+            return NextResponse.json(
+                { error: `A party named "${name}" already exists.` },
+                { status: 409 }
+            );
+        }
         // The form sends magnitude + Dr/Cr; storage is signed.
         const openingSigned  = toSigned(customerData.openBal, customerData.openingMode);
         const lastYearSigned = toSigned(customerData.lastBal, customerData.lastMode);
 
         const newCustomer= new Customer({
-            name:customerData.name,
+            name:name,
             email:customerData.email,
             openingBal:openingSigned,
             openingMode:modeOf(openingSigned),
@@ -31,7 +48,7 @@ export async function POST(req) {
             city:customerData.city,
             state:customerData.state,
             gstIn:customerData.gstIn,
-            stateCode:normalizeStateCode(customerData.stateCode),
+            stateCode:customerData.stateCode,
             pan:customerData.pan,
             aadhar:customerData.aadhar,
             bank:customerData.bank,

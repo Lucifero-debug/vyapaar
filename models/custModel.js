@@ -24,11 +24,21 @@ const customerSchema = new mongoose.Schema({
    state:{
     type:String,
    }, 
+   // A postal code is an identifier, not a quantity -- same reasoning as
+   // `phone` below. Indian PINs begin 1-8 so none has been truncated, but
+   // arithmetic on it is meaningless and a non-numeric postcode cannot be
+   // stored at all while it is a Number.
    pincode:{
-    type:Number,
+    type:String,
+    trim:true,
    }, 
+   // A phone number is an identifier, not a quantity. Stored as a Number it
+   // dropped a leading zero, could not hold "+91", a space, a dash or a second
+   // number after a comma, and disagreed with Invoice.customer.phone, which
+   // has always been a String.
    phone:{
-    type:Number,
+    type:String,
+    trim:true,
    }, 
    stateCode:{
     type:String,
@@ -93,6 +103,18 @@ type:String,
     type:Number
    }
 })
+
+
+// Parties are looked up by name on every posting, and by group whenever an
+// invoice needs its cash or bank account.
+//
+// NOTE: deliberately NOT unique. Adding a unique index to a collection that
+// already holds duplicates fails silently at build time and leaves you
+// thinking you are protected. Duplicates are refused in `customer-add` and
+// `customer-alter` instead. To make it unique for real: de-duplicate first,
+// then change this line to { unique: true }.
+customerSchema.index({ name: 1 });
+customerSchema.index({ group: 1 });
 
 const Customer= mongoose.models.customers || mongoose.model("customers",customerSchema)
 

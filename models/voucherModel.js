@@ -29,6 +29,12 @@ againstBill:{type:Boolean,default:false},
   timestamps: true,
 });
 
+
+// delete-cust checks both of these before letting a party go.
+voucherSchema.index({ acName: 1 });
+voucherSchema.index({ "customers.name": 1 });
+voucherSchema.index({ date: 1 });
+
 const Voucher = mongoose.models.Voucher || mongoose.model("Voucher", voucherSchema);
 
 export default Voucher;

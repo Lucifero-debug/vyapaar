@@ -2,6 +2,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { Suspense, useEffect, useState } from "react";
+import { COMPANY, companyAddress } from '@/lib/company.mjs';
 import ItemLedgerSearchParams from "../../components/ItemLedgerSearchParams";
 
 const formatQty = (num = 0) => parseFloat(num).toFixed(2);
@@ -105,10 +106,8 @@ if (data.all) {
       <div className="page-shell">
         {/* Header */}
         <div className="doc-head">
-          <h2 className="doc-org">SURYAVANSH TEXTILES</h2>
-          <p className="doc-meta">
-            LIG FLATS NO.68, IIIIRD FLOOR, SARITA VIHAR, NEW DELHI-110076
-          </p>
+          <h2 className="doc-org">{COMPANY.name}</h2>
+          <p className="doc-meta">{companyAddress()}</p>
           <p className="doc-kind">
             STOCK LEDGER {item ? `- ${item.name}` : ""}
           </p>

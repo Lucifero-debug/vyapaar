@@ -52,6 +52,12 @@ const itemSchema = new mongoose.Schema({
    }
 })
 
+
+// Same reasoning as custModel: joined by name everywhere, kept non-unique
+// until existing data is known to be clean. `item-add` refuses duplicates.
+itemSchema.index({ name: 1 });
+itemSchema.index({ hsn: 1 });
+
 const Item= mongoose.models.items || mongoose.model("items",itemSchema)
 
 export default Item

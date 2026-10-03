@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
 import Hsn from "../../../models/hsnModel";
 import Item from "../../../models/itemModel"; // use Item model instead of Product
+import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
 
 export async function POST(req) {
   try {
@@ -24,17 +25,14 @@ export async function POST(req) {
     }
 
     // Renaming onto another HSN's code would hit the unique index as a 500.
-    const clash = await Hsn.findOne({
-      hsncode: String(hsncode).trim(),
-      _id: { $ne: id },
-    });
+    const clash = await findNameClash(Hsn, "hsncode", hsncode, { excludeId: id });
     if (clash) {
       return NextResponse.json(
         {
           success: false,
-          message: "HSN already exists",
+          message: `HSN code "${normalizeName(hsncode)}" already exists.`,
         },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
