@@ -6,6 +6,7 @@ import { saveToLocal, getFromLocal, clearInvoiceDraft } from '@/lib/localStorage
 import InvoiceSearchParams from '@/components/suspense';
 import { useSaleOptions } from '@/context/SaleOptionContext';
 import { resolveItemPricing, latestPriceListFor } from '@/lib/priceList.mjs';
+import { normalizeStateCode } from '@/lib/states.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,8 @@ const [noOfPack, setNoOfPack] = useState(0);
     const [balanceDue, setBalanceDue] = useState(0)
     const [paymentType, setPaymentType] = useState('Cash')
     const [newTaxAmount, setNewTaxAmount] = useState('')
-    const [stateOfSupply, setStateOfSupply] = useState('Delhi')
+    const [stateOfSupply, setStateOfSupply] = useState('')
+    const [states, setStates] = useState([])
     const [item, setItem] = useState([])
     const [gst, setGst] = useState(0)
     const [selectedItem, setSelectedItem] = useState([])
@@ -64,6 +66,15 @@ const [noOfPack, setNoOfPack] = useState(0);
     const [newTaxName, setNewTaxName] = useState('')
     const [newTaxRate, setNewTaxRate] = useState('')
     const [priceLists, setPriceLists] = useState([])
+
+    // The state master carries the GST state code. The invoice stores both,
+    // so the bill can print the code without looking it up again.
+    useEffect(() => {
+        fetch('/api/get-state')
+            .then((res) => res.json())
+            .then((data) => setStates(data.state || []))
+            .catch((err) => console.error('Error fetching states:', err));
+    }, []);
 
     const formatDate = (dateString) => {
         return new Date(dateString).toISOString().substring(0, 10)
@@ -166,7 +177,7 @@ useEffect(() => {
                 setReceived(data.received || 0);
                 setBalanceDue(data.balanceDue || '');
                 setPaymentType(data.paymentType || 'Cash');
-                setStateOfSupply(data.stateOfSupply || 'Delhi');
+                setStateOfSupply(data.stateOfSupply || '');
                 setSelectedItem(normalizedItems);
                 setItemName(data.items?.name || '');
                 setQuantity(data.items?.quantity || '');
@@ -504,6 +515,9 @@ const saveItem = (e) => {
             paymentType,
             balanceDue,
             stateOfSupply,
+            stateCode: normalizeStateCode(
+                states.find((s) => s.name === stateOfSupply)?.code
+            ),
             taxType,
             gst,
             totalAmount:  Number(totalAmount),
@@ -662,13 +676,21 @@ const handleDispatchSave = () => {
                     <div className='flex justify-between items-center'>
                         <h2 className='text-sm font-medium text-foreground'>State Of Supply</h2>
                         <select 
-                            className='field-select w-36' 
+                            className='field-select w-48' 
                             value={stateOfSupply} 
                             onChange={(e) => setStateOfSupply(e.target.value)}
                         >
-                            <option value='Delhi'>Delhi</option>
-                            <option value='Mumbai'>Mumbai</option>
-                            <option value='Jaipur'>Jaipur</option>
+                            <option value=''>Select State</option>
+                            {states.map((s) => (
+                                <option value={s.name} key={s._id}>
+                                    {normalizeStateCode(s.code)} — {s.name}
+                                </option>
+                            ))}
+                            {/* An invoice saved before the master existed may
+                                hold a state that is not on the list. */}
+                            {stateOfSupply && !states.some((s) => s.name === stateOfSupply) && (
+                                <option value={stateOfSupply}>{stateOfSupply} (not in master)</option>
+                            )}
                         </select>
                     </div>
 

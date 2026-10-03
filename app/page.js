@@ -50,6 +50,7 @@ import {
 } from '../components/ui/popover';
 import HsnMaster from '@/components/HsnMaster';
 import CustomerGroupMaster from '@/components/CustomerGroupMaster';
+import StateMaster from '@/components/StateMaster';
 import PriceListMaster from '@/components/PriceListMaster';
 import { priceListLabel } from '@/lib/priceList.mjs';
 
@@ -63,6 +64,7 @@ const Page = () => {
   const router = useRouter();
   const [showHsnMaster, setShowHsnMaster] = useState(false);
   const [showGroupMaster, setShowGroupMaster] = useState(false);
+  const [showStateMaster, setShowStateMaster] = useState(false);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [customer, setCustomer] = useState([]);
@@ -83,6 +85,8 @@ const Page = () => {
   const [selectedHsn, setSelectedHsn] = useState(null);
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
+  const [states, setStates] = useState([]);
+  const [selectedState, setSelectedState] = useState(null);
   const [priceLists, setPriceLists] = useState([]);
   const [showPriceListMaster, setShowPriceListMaster] = useState(false);
   const [selectedPriceList, setSelectedPriceList] = useState(null);
@@ -117,7 +121,7 @@ const Page = () => {
 
     const fetchData = async () => {
       try {
-        const [items, customers, invoices, hsnCodes, vouchers, lists, groupList] =
+        const [items, customers, invoices, hsnCodes, vouchers, lists, groupList, stateList] =
           await Promise.all([
             loadJson('/api/get-item', (d) => d.item),
             loadJson('/api/get-customer', (d) => d.customer),
@@ -126,6 +130,7 @@ const Page = () => {
             loadJson('/api/get-voucher', (d) => d.voucher),
             loadJson('/api/get-price-list', (d) => d.priceList),
             loadJson('/api/get-group', (d) => d.group),
+            loadJson('/api/get-state', (d) => d.state),
           ]);
 
         setCustomer(
@@ -145,6 +150,8 @@ const Page = () => {
         setHsn(hsnCodes.map(hs => ({ ...hs, id: hs._id })));
 
         setGroups(groupList.map(g => ({ ...g, id: g._id })));
+
+        setStates(stateList.map(s => ({ ...s, id: s._id })));
 
         setPriceLists(
           lists.map(pl => ({
@@ -241,6 +248,14 @@ const Page = () => {
           }
           break;
         }
+        case 'State': {
+          const selected = states.find(s => s.id === newValue);
+          if (selected) {
+            setSelectedState(selected);
+            setShowStateMaster(true);
+          }
+          break;
+        }
         case 'CustomerGroup': {
           const selected = groups.find(g => g.id === newValue);
           if (selected) {
@@ -290,6 +305,9 @@ const Page = () => {
         break;
       case 'CustomerGroup':
         endpoint = `/api/delete-group?id=${currentValue}`;
+        break;
+      case 'State':
+        endpoint = `/api/delete-state?id=${currentValue}`;
         break;
       case 'PriceList':
         endpoint = `/api/delete-price-list?id=${currentValue}`;
@@ -353,6 +371,7 @@ const Page = () => {
       case 'Item': return item;
       case 'HSN': return hsn;
       case 'CustomerGroup': return groups;
+      case 'State': return states;
       case 'PriceList': return priceLists;
       case 'Bank': return bank;
       case 'Cash': return cash;
@@ -368,6 +387,7 @@ const Page = () => {
     sectionName === 'Customer' ||
     sectionName === 'Item' ||
     sectionName === 'CustomerGroup' ||
+    sectionName === 'State' ||
     sectionName === 'PriceList' ||
     sectionName === 'Bank' ||
     sectionName === 'Cash';
@@ -730,6 +750,16 @@ const Page = () => {
               },
             })}
             {renderModuleRow({
+              section: "State",
+              label: "States",
+              icon: Landmark,
+              count: states.length,
+              onCreate: () => {
+                setSelectedState(null);
+                setShowStateMaster(true);
+              },
+            })}
+            {renderModuleRow({
               section: "PriceList",
               label: "Price Lists",
               icon: Tags,
@@ -839,6 +869,18 @@ const Page = () => {
             if (saved === true) window.location.reload();
           }}
           selected={selectedHsn}
+        />
+      )}
+
+      {showStateMaster && (
+        <StateMaster
+          open={showStateMaster}
+          onClose={(saved) => {
+            setShowStateMaster(false);
+            setSelectedState(null);
+            if (saved === true) window.location.reload();
+          }}
+          selected={selectedState}
         />
       )}
 

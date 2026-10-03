@@ -52,6 +52,10 @@ customer: {
 ],
     paymentType: { type: String },  // e.g. Cash / Cheque
     stateOfSupply: { type: String }, // e.g. Delhi
+    // The GST state code of the state of supply, copied from the state master
+    // when the bill is raised. Declared, or Mongoose strict mode drops it and
+    // the printed bill has no code to show.
+    stateCode: { type: String },
     taxType: { type: String },  // local / central
     gst: { type: Number },
     totalAmount: { type: Number, required: true },

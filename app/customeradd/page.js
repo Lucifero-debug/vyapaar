@@ -24,12 +24,16 @@ const PageContent = () => {
   const [short, setShort] = useState('');
   const [group, setGroup] = useState('');
   const [groups, setGroups] = useState([]);
-  const [openBal, setOpenBal] = useState(0);
+  const [states, setStates] = useState([]);
+  // Empty, not 0. A box pre-filled with 0 has to be cleared before anything can
+  // be typed into it, and here 0 and "nothing entered" mean the same thing: the
+  // schema defaults openingBal to 0 and toSigned() already reads a blank as 0.
+  const [openBal, setOpenBal] = useState('');
   const [openingMode,setOpeningMode] = useState('')
   const [lastMode,setLastMode] = useState('')
   // Display only: what the books currently say this party owes.
   const [running, setRunning] = useState(null)
-  const [lastBal, setLastBal] = useState(0);
+  const [lastBal, setLastBal] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
   const [phone, setPhone] = useState('');
@@ -49,6 +53,15 @@ const PageContent = () => {
   // three slightly different ways -- which matters because customers are filed
   // under the group's NAME and invoices resolve their cash and bank accounts
   // by it.
+  // The state master carries the GST state code, so picking a state fills the
+  // code in rather than leaving somebody to remember that Delhi is 07.
+  useEffect(() => {
+    fetch('/api/get-state')
+      .then((res) => res.json())
+      .then((data) => setStates(data.state || []))
+      .catch((err) => console.error('Error fetching states:', err));
+  }, []);
+
   useEffect(() => {
     fetch('/api/get-group')
       .then((res) => res.json())
@@ -76,8 +89,9 @@ const PageContent = () => {
           // NOT the live running balance -- loading the latter here is what
           // let an unrelated edit write it straight back and clobber it.
           const lastYear = toDisplay(d.lastYearBal);
-          setOpenBal(opening.amount);
-          setLastBal(lastYear.amount);
+          // A party with a zero balance loads a blank box, same as a new one.
+          setOpenBal(opening.amount || '');
+          setLastBal(lastYear.amount || '');
           setRunning(toDisplay(d.lastBal));
           setAddress(d.address || '');
           setPincode(d.pincode ?? '');
@@ -211,7 +225,7 @@ const PageContent = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Opening Balance</Label>
-                <Input type='number' value={openBal} onChange={e => setOpenBal(+e.target.value)} />
+                <Input type='number' placeholder='0' value={openBal} onChange={e => setOpenBal(e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Dr/Cr</Label>
@@ -227,7 +241,7 @@ const PageContent = () => {
               </div>
               <div className="space-y-1">
                 <Label>Last Year Balance</Label>
-                <Input type='number' value={lastBal} onChange={e => setLastBal(+e.target.value)} />
+                <Input type='number' placeholder='0' value={lastBal} onChange={e => setLastBal(e.target.value)} />
                 <p className="field-hint">Reference only. Does not affect the running balance.</p>
               </div>
               <div className="space-y-1">
@@ -278,8 +292,8 @@ const PageContent = () => {
                 { label: 'City', val: city, fn: setCity, type: 'text' },
                 { label: 'Phone', val: phone, fn: setPhone, type: 'tel', inputMode: 'tel', placeholder: 'e.g. +91 98111 22233' },
                 { label: 'GSTIN', val: gstIn, fn: setGstIn, type: 'text' },
-                { label: 'State', val: state, fn: setState, type: 'text' },
-                { label: 'State Code', val: stateCode, fn: (v) => setStateCode(v.replace(/\D/g, '').slice(0, 2)), type: 'text', inputMode: 'numeric', placeholder: 'e.g. 07' },
+                { label: 'State', val: state, fn: setState, type: 'state' },
+                { label: 'State Code', val: stateCode, fn: setStateCode, type: 'text', readOnly: true, placeholder: 'from the state' },
                 { label: 'Email', val: email, fn: setEmail, type: 'text' },
                 { label: 'PAN', val: pan, fn: setPan, type: 'text' },
                 { label: 'Aadhar', val: aadhar, fn: setAadhar, type: 'text' },
@@ -290,13 +304,42 @@ const PageContent = () => {
               ].map((field, idx) => (
                 <div className="space-y-1" key={idx}>
                   <Label>{field.label}</Label>
-                  <Input
-                    type={field.type}
-                    inputMode={field.inputMode}
-                    placeholder={field.placeholder}
-                    value={field.val}
-                    onChange={e => field.fn(field.type === 'number' ? +e.target.value : e.target.value)}
-                  />
+                  {field.type === 'state' ? (
+                    <select
+                      className="field-select"
+                      value={field.val}
+                      onChange={e => {
+                        const name = e.target.value;
+                        setState(name);
+                        // The code follows the state. It is read-only beside
+                        // this, so the two cannot be set to disagree.
+                        const picked = states.find(s => s.name === name);
+                        setStateCode(picked ? normalizeStateCode(picked.code) : '');
+                      }}
+                    >
+                      <option value="">Select State</option>
+                      {states.map(s => (
+                        <option value={s.name} key={s._id}>
+                          {normalizeStateCode(s.code)} — {s.name}
+                        </option>
+                      ))}
+                      {/* A party saved before the master existed may hold a
+                          state that is not on the list. Offer it rather than
+                          silently clearing it. */}
+                      {field.val && !states.some(s => s.name === field.val) && (
+                        <option value={field.val}>{field.val} (not in master)</option>
+                      )}
+                    </select>
+                  ) : (
+                    <Input
+                      type={field.type}
+                      inputMode={field.inputMode}
+                      placeholder={field.placeholder}
+                      readOnly={field.readOnly}
+                      value={field.val}
+                      onChange={e => field.fn(field.type === 'number' ? +e.target.value : e.target.value)}
+                    />
+                  )}
                 </div>
               ))}
             </div>
