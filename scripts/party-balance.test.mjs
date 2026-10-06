@@ -12,7 +12,7 @@
  */
 
 import assert from "node:assert/strict";
-import { livePartyFor } from "../lib/partyBalance.mjs";
+import { livePartyFor, balanceGloss, partyCity } from "../lib/partyBalance.mjs";
 import { formatINR } from "../lib/currency.mjs";
 import { toDisplay } from "../lib/balance.mjs";
 
@@ -30,9 +30,9 @@ const test = (name, fn) => {
 
 // The master, in the shape /api/get-customer returns it.
 const MASTER = [
-  { _id: "aaa", name: "Ramesh Traders", lastBal: 1500, lastMode: "Dr" },
-  { _id: "bbb", name: "Verma Textiles", lastBal: -2400.5, lastMode: "Cr" },
-  { _id: "ccc", name: "Settled Party", lastBal: 0, lastMode: "Dr" },
+  { _id: "aaa", name: "Ramesh Traders", city: "Ludhiana", lastBal: 1500, lastMode: "Dr" },
+  { _id: "bbb", name: "Verma Textiles", city: "Surat", lastBal: -2400.5, lastMode: "Cr" },
+  { _id: "ccc", name: "Settled Party", city: "", lastBal: 0, lastMode: "Dr" },
   { _id: "ddd", name: "Never Traded" },
 ];
 
@@ -138,6 +138,89 @@ test("formatINR never prints NaN at a customer", () => {
   assert.equal(formatINR(undefined), "₹0.00");
   assert.equal(formatINR("abc"), "₹0.00");
   assert.equal(formatINR(null), "₹0.00");
+});
+
+console.log("\n--- the wording depends on what kind of account it is ---");
+
+test("a trading party owes us on Dr and is owed on Cr", () => {
+  assert.equal(balanceGloss("Dr", "Sundry Debtors"), "owes you");
+  assert.equal(balanceGloss("Cr", "Sundry Debtors"), "you owe");
+  assert.equal(balanceGloss("Dr", ""), "owes you");
+  assert.equal(balanceGloss("Cr", undefined), "you owe");
+});
+
+test("the cash drawer holds money on Dr, it does not owe it", () => {
+  // "Cash owes you Rs 50,000" is nonsense -- the drawer IS the fifty thousand.
+  assert.equal(balanceGloss("Dr", "Cash"), "in hand");
+  assert.equal(balanceGloss("Cr", "Cash"), "overdrawn");
+});
+
+test("a bank account reads as a balance in the account", () => {
+  assert.equal(balanceGloss("Dr", "Bank"), "in account");
+  assert.equal(balanceGloss("Cr", "Bank"), "overdrawn");
+});
+
+test("the group is matched the way the cash resolver matches it", () => {
+  // lib/cashAccount.mjs uses /^cash$/i and /^bank$/i, so case and stray
+  // whitespace must not change the reading.
+  assert.equal(balanceGloss("Dr", "cash"), "in hand");
+  assert.equal(balanceGloss("Dr", "  CASH  "), "in hand");
+  assert.equal(balanceGloss("Dr", "bank"), "in account");
+  assert.equal(balanceGloss("Cr", " Bank"), "overdrawn");
+});
+
+test("a group that merely contains the word cash is a trading party", () => {
+  // "Cash Sales Parties" is a normal debtor group, not the drawer.
+  assert.equal(balanceGloss("Dr", "Cash Sales Parties"), "owes you");
+  assert.equal(balanceGloss("Dr", "Petty Cash Staff"), "owes you");
+  assert.equal(balanceGloss("Dr", "Bank Guarantee Parties"), "owes you");
+});
+
+console.log("\n--- the city comes off the master, not off the document ---");
+
+/** The city the line would print for a given selection. */
+const cityShown = (selected, customers = MASTER) =>
+  partyCity(livePartyFor(selected, customers));
+
+test("a party picked from the dropdown shows its city", () => {
+  assert.equal(cityShown(MASTER[0]), "Ludhiana");
+  assert.equal(cityShown(MASTER[1]), "Surat");
+});
+
+test("a reopened invoice still shows the city", () => {
+  // The invoice snapshot is only { name, phone, email, custId } -- it has no
+  // city on it, so reading selectedCustomer.city would print the city while
+  // writing a bill and nothing at all on every saved one.
+  const snapshot = { name: "Ramesh Traders", phone: "9876543210", custId: "aaa" };
+  assert.equal(snapshot.city, undefined, "the snapshot must not carry a city");
+  assert.equal(cityShown(snapshot), "Ludhiana");
+});
+
+test("a party with no city prints nothing, not undefined", () => {
+  assert.equal(cityShown(MASTER[2]), "");
+  assert.equal(cityShown(MASTER[3]), "");
+  assert.equal(partyCity(undefined), "");
+  assert.equal(partyCity({}), "");
+  assert.equal(partyCity({ city: null }), "");
+});
+
+test("a whitespace-only city is nothing, not a stray separator", () => {
+  // Rendered as-is this would print "   " followed by the separator dot, which
+  // reads as a missing word rather than as no city.
+  assert.equal(partyCity({ city: "   " }), "");
+  assert.equal(partyCity({ city: "\t\n" }), "");
+});
+
+test("a city keeps its inner spacing and case", () => {
+  assert.equal(partyCity({ city: "  New Delhi  " }), "New Delhi");
+  assert.equal(partyCity({ city: "Navi Mumbai" }), "Navi Mumbai");
+});
+
+test("the city never decides the balance, and vice versa", () => {
+  // A party whose city changed is still the same party with the same balance.
+  const moved = [{ _id: "aaa", name: "Ramesh Traders", city: "Amritsar", lastBal: 1500 }];
+  assert.equal(cityShown({ name: "Ramesh Traders", custId: "aaa" }, moved), "Amritsar");
+  assert.equal(shown({ name: "Ramesh Traders", custId: "aaa" }, moved), "\u20B91,500.00 Dr");
 });
 
 console.log(`\n  ${passed} checks passed\n`);

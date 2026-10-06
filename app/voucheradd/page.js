@@ -2,6 +2,7 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import VoucherSearchParams from "@/components/VoucherSearchparams";
+import PartyBalance from "@/components/PartyBalance";
 
 const AddVoucher = () => {
   const [voucherParams, setVoucherParams] = useState({ type: "", value: "" });
@@ -217,7 +218,7 @@ const AddVoucher = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Table */}
           <div className="table-wrap">
-            <table className="data-table min-w-[680px]">
+            <table className="data-table min-w-[760px]">
               <thead>
                 <tr>
                   <th>Account Name</th>
@@ -247,6 +248,13 @@ const AddVoucher = () => {
                           </option>
                         ))}
                       </select>
+                      {/* Where this party is and what they stand at, as the
+                          same subtext the billing pages show under their
+                          customer picker. */}
+                      <PartyBalance
+                        selected={{ name: entry.name, custId: entry.custId }}
+                        customers={customers}
+                      />
                     </td>
                     <td>
                       <input
@@ -332,6 +340,9 @@ const AddVoucher = () => {
                     </option>
                   ))}
               </select>
+              {/* The cash drawer / bank account itself. Dr here is money held,
+                  not money owed, which is why the wording is group-aware. */}
+              <PartyBalance selected={{ name: form.acName }} customers={customers} />
             </div>
 
             <div>

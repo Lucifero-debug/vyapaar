@@ -8,6 +8,7 @@ import { useSaleOptions } from '@/context/SaleOptionContext';
 import { resolveItemPricing, latestPriceListFor } from '@/lib/priceList.mjs';
 import { normalizeStateCode } from '@/lib/states.mjs';
 import PartyBalance from '@/components/PartyBalance';
+import ItemStock from '@/components/ItemStock';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,7 @@ const [noOfPack, setNoOfPack] = useState(0);
     const [gst, setGst] = useState(0)
     const [selectedItem, setSelectedItem] = useState([])
     const [itemName, setItemName] = useState('')
+    const [stock, setStock] = useState([])
     const [quantity, setQuantity] = useState('')
     const [rate, setRate] = useState('')
     const [discount, setDiscount] = useState(0)
@@ -334,6 +336,20 @@ const addPartyTax = () => {
 
     // Fetch items and customers
     useEffect(() => {
+        // Stock is summed from the stock ledger, not read off
+        // Item.lastQuantity -- nothing in the posting path maintains that field.
+        const fetchStock = async () => {
+            try {
+                const response = await fetch('/api/item-stock')
+                const result = await response.json()
+                setStock(result.stock || [])
+            } catch (error) {
+                // A stock figure is worth having but not worth blocking a bill
+                // over, so this one stays quiet and the line simply hides.
+                console.error('Error fetching item stock:', error);
+            }
+        }
+
         const fetchItem = async () => {
             try {
                 const response = await fetch('/api/get-item')
@@ -370,6 +386,7 @@ const addPartyTax = () => {
 
         fetchCust()
         fetchItem()
+        fetchStock()
         fetchPriceLists()
     }, [])
 
@@ -828,7 +845,13 @@ const handleDispatchSave = () => {
                                 <tbody>
                                     {selectedItem.map((items, index) => (
                                         <tr key={index}>
-                                            <td>{items.name}</td>
+                                            <td>
+                                                {items.name}
+                                                {/* Stock before this invoice:
+                                                    nothing posts to the stock
+                                                    ledger until it is saved. */}
+                                                <ItemStock name={items.name} stock={stock} />
+                                            </td>
                                             <td>
                                                 <input 
                                                     type='number' 
