@@ -4,6 +4,7 @@ import "./globals.css";
 import Backbutton from "@/components/Backbutton";
 import ReloadButton from "@/components/ReloadButton";
 import { SaleOptionProvider } from '@/context/SaleOptionContext';
+import TodaysOrders from "@/components/TodaysOrders";
 import UserMenu from "@/components/UserMenu";
 
 const geistSans = Geist({
@@ -72,6 +73,10 @@ export default function RootLayout({ children }) {
           </header>
 
           <main>{children}</main>
+
+          {/* Once each morning: the bills raised against an order dated
+              today, which nothing else in the app ever shows again. */}
+          <TodaysOrders />
         </SaleOptionProvider>
       </body>
     </html>
