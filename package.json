@@ -13,7 +13,7 @@
     "export": "next export",
     "migrate:balances": "node scripts/migrate-balances.mjs",
     "migrate:balances:apply": "node scripts/migrate-balances.mjs --apply",
-    "test": "node scripts/auth.test.mjs && node scripts/tenant-scope.test.mjs && node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/backfill-hsn-totals.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs && node scripts/posting-invariants.test.mjs && node scripts/price-list.test.mjs && node scripts/clear-zero-units.test.mjs && node scripts/phone-to-string.test.mjs && node scripts/blank-zeros.test.mjs && node scripts/customer-groups.test.mjs && node scripts/states.test.mjs && node scripts/party-balance.test.mjs && node scripts/item-stock.test.mjs && node scripts/clear-transactions.test.mjs && node scripts/place-of-supply.test.mjs",
+    "test": "node scripts/auth.test.mjs && node scripts/tenant-scope.test.mjs && node scripts/migrate-balances.test.mjs && node scripts/voucher-ledger.test.mjs && node scripts/rebuild-voucher-ledger.test.mjs && node scripts/backfill-hsn-totals.test.mjs && node scripts/invoice-posting.test.mjs && node scripts/posting-consistency.test.mjs && node scripts/posting-invariants.test.mjs && node scripts/price-list.test.mjs && node scripts/clear-zero-units.test.mjs && node scripts/phone-to-string.test.mjs && node scripts/blank-zeros.test.mjs && node scripts/customer-groups.test.mjs && node scripts/states.test.mjs && node scripts/party-balance.test.mjs && node scripts/item-stock.test.mjs && node scripts/clear-transactions.test.mjs && node scripts/place-of-supply.test.mjs && node scripts/index-audit.test.mjs",
     "rebuild:voucher-ledger": "node scripts/rebuild-voucher-ledger.mjs",
     "rebuild:voucher-ledger:apply": "node scripts/rebuild-voucher-ledger.mjs --apply",
     "backfill:hsn-totals": "node scripts/backfill-hsn-totals.mjs",
@@ -30,6 +30,8 @@
     "seed:groups:apply": "node scripts/seed-customer-groups.mjs --apply",
     "seed:states": "node scripts/seed-states.mjs",
     "seed:states:apply": "node scripts/seed-states.mjs --apply",
+    "sync:indexes": "node scripts/sync-indexes.mjs",
+    "sync:indexes:apply": "node scripts/sync-indexes.mjs --apply",
     "adopt:tenant": "node scripts/adopt-tenant.mjs",
     "adopt:tenant:apply": "node scripts/adopt-tenant.mjs --apply"
   },
