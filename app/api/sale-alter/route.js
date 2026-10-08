@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Invoice from "../../../models/invoiceModel";
 import Customer from "../../../models/custModel";
+import State from "../../../models/stateModel";
 import Ledger from "../../../models/ledgerModel";
 import { applyDelta, toDisplay } from "@/lib/balance.mjs";
 import { resolveCashAccount } from "@/lib/cashAccount.mjs";
@@ -14,6 +15,7 @@ import {
   recomputeLedgerBalances,
 } from "@/lib/runningBalances.mjs";
 import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
+import { needsStateLookup, placeOfSupply } from "@/lib/placeOfSupply.mjs";
 import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 async function handlePOST(req, auth) {
@@ -63,6 +65,26 @@ async function handlePOST(req, auth) {
         }
       }
 
+      // The party as the master stands now, read before the update because the
+      // invoice takes its state from them.
+      const party = await Customer.findOne(
+        { name: invoiceData.customer?.name },
+        { _id: 1, name: 1, state: 1, stateCode: 1 },
+        { session }
+      ).lean();
+
+      // The place of supply is the party's own state, from their master -- not
+      // whatever the form sent. It used to be a dropdown picked per bill, and
+      // the state code is what decides CGST+SGST against IGST, so a slip there
+      // is not cosmetic. lib/placeOfSupply.mjs.
+      let place = placeOfSupply(party);
+      if (needsStateLookup(party)) {
+        // Only for a party recorded before the state dropdown existed, who
+        // has the name and no code (or the reverse). Normally skipped.
+        const states = await State.find({}, { name: 1, code: 1 }, { session }).lean();
+        place = placeOfSupply(party, states);
+      }
+
       const updatedInvoice = await Invoice.findOneAndUpdate(
         { invoiceNo: lookupNo },
         {
@@ -74,8 +96,8 @@ async function handlePOST(req, auth) {
             email: invoiceData.customer.email,
           },
           paymentType: invoiceData.paymentType,
-          stateOfSupply: invoiceData.stateOfSupply,
-          stateCode: invoiceData.stateCode || "",
+          stateOfSupply: place.stateOfSupply,
+          stateCode: place.stateCode,
           taxType: invoiceData.taxType,
           gst: invoiceData.gst,
           totalAmount: invoiceData.totalAmount,

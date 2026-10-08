@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Invoice from "@/models/invoiceModel";
 import { getNextInvoiceNo, raiseInvoiceCounter } from "@/lib/getNextInvoiceNo";
 import Customer from "../../../models/custModel";
+import State from "../../../models/stateModel";
 import Ledger from "../../../models/ledgerModel";
 import { balancePipeline, round2 } from "@/lib/balance.mjs";
 import { resolvePaymentAccount } from "@/lib/cashAccount.mjs";
@@ -15,6 +16,7 @@ import {
   recomputeLedgerBalances,
 } from "@/lib/runningBalances.mjs";
 import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
+import { needsStateLookup, placeOfSupply } from "@/lib/placeOfSupply.mjs";
 import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 async function handlePOST(req, auth) {
@@ -56,29 +58,54 @@ async function handlePOST(req, auth) {
       const received = round2(body.received);
       const balanceDue = round2(finalAmount - received);
 
-      const [invoice] = await Invoice.create(
-        [{ ...body, invoiceNo, finalAmount, received, balanceDue }],
-        { session }
-      );
-
       // CUSTOMER & LEDGER LOGIC
       // Uploads used to skip this entirely, so an AI-imported purchase bill
       // created an invoice and stock rows but never reached payables. An
       // invoice nobody can attribute is refused outright rather than quietly
       // kept outside the books.
+      //
+      // Read BEFORE the invoice is written, because the invoice takes its
+      // state from this party, and because refusing an unknown party without
+      // having written anything first beats rolling the write back.
       const customer = await Customer.findOne(
-        { name: body.customer.name },
-        { _id: 1, name: 1 },
+        { name: body.customer?.name },
+        { _id: 1, name: 1, state: 1, stateCode: 1 },
         { session }
       ).lean();
 
       if (!customer) {
-        // Rolls the invoice back instead of stranding it.
         throw new AbortTransaction({
           success: false,
           error: "Customer not found",
         });
       }
+
+      // The place of supply is the party's own state, from their master -- not
+      // whatever the form sent. It used to be a dropdown picked per bill, and
+      // the state code is what decides CGST+SGST against IGST, so a slip there
+      // is not cosmetic. lib/placeOfSupply.mjs.
+      let place = placeOfSupply(customer);
+      if (needsStateLookup(customer)) {
+        // Only for a party recorded before the state dropdown existed, who
+        // has the name and no code (or the reverse). Normally skipped.
+        const states = await State.find({}, { name: 1, code: 1 }, { session }).lean();
+        place = placeOfSupply(customer, states);
+      }
+
+      const [invoice] = await Invoice.create(
+        [
+          {
+            ...body,
+            stateOfSupply: place.stateOfSupply,
+            stateCode: place.stateCode,
+            invoiceNo,
+            finalAmount,
+            received,
+            balanceDue,
+          },
+        ],
+        { session }
+      );
 
       // Posting the net `balanceDue` is what made a fully-paid sale vanish:
       // the delta came out as zero and the money received was never booked.

@@ -6,7 +6,7 @@ import { saveToLocal, getFromLocal, clearInvoiceDraft } from '@/lib/localStorage
 import InvoiceSearchParams from '@/components/suspense';
 import { useSaleOptions } from '@/context/SaleOptionContext';
 import { resolveItemPricing, latestPriceListFor } from '@/lib/priceList.mjs';
-import { normalizeStateCode } from '@/lib/states.mjs';
+import { placeOfSupply, placeOfSupplyLabel } from '@/lib/placeOfSupply.mjs';
 import PartyBalance from '@/components/PartyBalance';
 import ItemStock from '@/components/ItemStock';
 
@@ -507,6 +507,22 @@ const saveItem = (e) => {
     setQuantityPerPack(0);
 };
 
+    // The place of supply is the party's own state, taken from their master.
+    // It used to be a dropdown picked per bill: one more thing to get right on
+    // every invoice, and the state code is what decides CGST+SGST against
+    // IGST, so a slip there is not cosmetic. The server derives it again from
+    // the master when the invoice is saved -- this is the same rule, so that
+    // what is shown here is what gets stored.
+    //
+    // The fallback is for an invoice saved before the party's master carried a
+    // state: it keeps showing whatever that invoice holds.
+    const place = placeOfSupply(
+        selectedCustomer?.state || selectedCustomer?.stateCode
+            ? selectedCustomer
+            : { state: stateOfSupply },
+        states
+    );
+
     // Save invoice function
     const submitInvoice = async () => {
         const phone            = selectedCustomer.phone;
@@ -532,10 +548,8 @@ const saveItem = (e) => {
             'return': true,
             paymentType,
             balanceDue,
-            stateOfSupply,
-            stateCode: normalizeStateCode(
-                states.find((s) => s.name === stateOfSupply)?.code
-            ),
+            stateOfSupply: place.stateOfSupply,
+            stateCode: place.stateCode,
             taxType,
             gst,
             totalAmount:  Number(totalAmount),
@@ -695,25 +709,24 @@ const handleDispatchSave = () => {
                         <PartyBalance selected={selectedCustomer} customers={customer} />
                     </div>
 
-                    <div className='flex justify-between items-center'>
+                    {/* Read only, because it comes from the party's master.
+                        Shown rather than hidden so whoever is billing can see
+                        what will print, and notice a party who has no state. */}
+                    <div className='flex justify-between items-start'>
                         <h2 className='text-sm font-medium text-foreground'>State Of Supply</h2>
-                        <select 
-                            className='field-select w-48' 
-                            value={stateOfSupply} 
-                            onChange={(e) => setStateOfSupply(e.target.value)}
-                        >
-                            <option value=''>Select State</option>
-                            {states.map((s) => (
-                                <option value={s.name} key={s._id}>
-                                    {normalizeStateCode(s.code)} — {s.name}
-                                </option>
-                            ))}
-                            {/* An invoice saved before the master existed may
-                                hold a state that is not on the list. */}
-                            {stateOfSupply && !states.some((s) => s.name === stateOfSupply) && (
-                                <option value={stateOfSupply}>{stateOfSupply} (not in master)</option>
+                        <div className='w-48 text-right'>
+                            <p className='text-sm font-medium tabular-nums text-foreground'>
+                                {placeOfSupplyLabel(place) || '—'}
+                            </p>
+                            {selectedCustomer?.name && !place.stateOfSupply && (
+                                <p className='field-hint text-destructive'>
+                                    This party has no state on their master.
+                                </p>
                             )}
-                        </select>
+                            {!selectedCustomer?.name && (
+                                <p className='field-hint'>From the party's master.</p>
+                            )}
+                        </div>
                     </div>
 
                     <div className='flex justify-between items-center'>
