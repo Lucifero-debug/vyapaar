@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
 import { type } from "os";
 
 
@@ -57,6 +58,10 @@ const itemSchema = new mongoose.Schema({
 // until existing data is known to be clean. `item-add` refuses duplicates.
 itemSchema.index({ name: 1 });
 itemSchema.index({ hsn: 1 });
+
+// Every row belongs to one firm. The plugin adds companyId, scopes every
+// query to it, and stamps it onto everything created -- see lib/tenantPlugin.mjs.
+itemSchema.plugin(tenantPlugin);
 
 const Item= mongoose.models.items || mongoose.model("items",itemSchema)
 

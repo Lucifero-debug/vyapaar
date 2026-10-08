@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
 
 const voucherSchema = new mongoose.Schema({
   acName: {
@@ -34,6 +35,10 @@ againstBill:{type:Boolean,default:false},
 voucherSchema.index({ acName: 1 });
 voucherSchema.index({ "customers.name": 1 });
 voucherSchema.index({ date: 1 });
+
+// Every row belongs to one firm. The plugin adds companyId, scopes every
+// query to it, and stamps it onto everything created -- see lib/tenantPlugin.mjs.
+voucherSchema.plugin(tenantPlugin);
 
 const Voucher = mongoose.models.Voucher || mongoose.model("Voucher", voucherSchema);
 

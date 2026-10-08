@@ -3,6 +3,7 @@ import { connect } from "@/lib/mongodb";
 import Item from "@/models/itemModel";
 import ItemLedger from "@/models/itemLedgerModel";
 import { buildStockIndex } from "@/lib/itemStock.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 // Stock changes on every invoice, so a cached answer is a wrong answer.
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
  * movements are summed in the database rather than shipped row by row -- the
  * stock ledger is the biggest collection in the app.
  */
-export async function GET() {
+async function handleGET(req, auth) {
   try {
     await connect();
 
@@ -40,3 +41,7 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const GET = tenantRoute(handleGET);

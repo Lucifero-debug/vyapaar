@@ -9,8 +9,9 @@ import { applyDelta, modeOf, round2, toSigned } from '@/lib/balance.mjs'
 import { withTransaction, AbortTransaction } from '@/lib/withTransaction.mjs'
 import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
 import { normalizeStateCode } from '@/lib/gst.mjs'
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
-export async function POST(req) {
+async function handlePOST(req, auth) {
     try {
         const customerData = await req.json();
         const customerId = customerData.id;
@@ -143,3 +144,7 @@ export async function POST(req) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const POST = tenantRoute(handlePOST);

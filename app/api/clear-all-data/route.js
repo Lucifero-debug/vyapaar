@@ -9,6 +9,7 @@ import Counter from "../../../models/counterModel";
 import PriceList from "../../../models/priceListModel";
 import { NextResponse } from "next/server";
 import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 /**
  * Wipe the books. Used to reset between demo runs.
@@ -24,7 +25,7 @@ import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
  */
 export const CONFIRM_PHRASE = "DELETE ALL DATA";
 
-export async function DELETE(req) {
+async function handleDELETE(req, auth) {
   try {
     let body = {};
     try {
@@ -78,3 +79,7 @@ export async function DELETE(req) {
     );
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const DELETE = tenantRoute(handleDELETE);

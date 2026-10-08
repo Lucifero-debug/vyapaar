@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
 import Invoice from "../../../models/invoiceModel";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
  * Dates are stored as UTC midnight of the chosen day (see the invoice forms),
  * so the range runs from `from` 00:00 UTC up to, not including, the day after `to`.
  */
-export async function GET(req) {
+async function handleGET(req, auth) {
   try {
     const params = new URL(req.url).searchParams;
     const from = params.get("from");
@@ -63,3 +64,7 @@ export async function GET(req) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const GET = tenantRoute(handleGET);

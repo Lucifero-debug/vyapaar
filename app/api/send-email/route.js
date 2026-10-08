@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { COMPANY } from "@/lib/company.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 /**
  * Email an invoice PDF to the party it was raised against.
@@ -16,7 +17,7 @@ const FROM = process.env.INVOICE_FROM_EMAIL
 
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
-export async function POST(req) {
+async function handlePOST(req, auth) {
   try {
     // Missing configuration used to surface as an opaque failure from the
     // Resend client. Say what is actually wrong.
@@ -79,3 +80,7 @@ export async function POST(req) {
     );
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const POST = tenantRoute(handlePOST);

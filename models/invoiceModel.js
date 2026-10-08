@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
 
 const itemSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -24,7 +25,7 @@ const partyTaxSchema = new mongoose.Schema({
 
 const invoiceSchema = new mongoose.Schema(
   {
-    invoiceNo: { type: Number, required: true,unique:true },
+    invoiceNo: { type: Number, required: true },
     againstInvoiceNo: { type: Number },
     date: { type: Date, required: true },
     
@@ -103,5 +104,13 @@ invoiceSchema.index({ date: 1, invoiceNo: 1 });
 invoiceSchema.index({ type: 1, return: 1, date: 1 });
 invoiceSchema.index({ "customer.name": 1 });
 invoiceSchema.index({ "items.name": 1 });
+
+// Every row belongs to one firm. The plugin adds companyId, scopes every
+// query to it, and stamps it onto everything created -- see lib/tenantPlugin.mjs.
+invoiceSchema.plugin(tenantPlugin);
+
+// Unique per FIRM. Globally unique invoice numbers meant the second firm to
+// open could not write invoice 1.
+invoiceSchema.index({ companyId: 1, invoiceNo: 1 }, { unique: true });
 
 export default mongoose.models.Invoice || mongoose.model('Invoice', invoiceSchema);

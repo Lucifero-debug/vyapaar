@@ -3,8 +3,9 @@ import Item from "../../../models/itemModel";
 import ItemLedger from "../../../models/itemLedgerModel";
 import { withTransaction, AbortTransaction } from "@/lib/withTransaction.mjs";
 import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
-export async function POST(req) {
+async function handlePOST(req, auth) {
     try {
         const itemData = await req.json();
         const itemId = itemData.id;
@@ -80,3 +81,7 @@ export async function POST(req) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const POST = tenantRoute(handlePOST);

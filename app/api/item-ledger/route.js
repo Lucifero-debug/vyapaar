@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { connect } from "@/lib/mongodb";
 import ItemLedger from "@/models/itemLedgerModel";
 import Item from "@/models/itemModel";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
-export async function GET(req) {
+async function handleGET(req, auth) {
   try {
     await connect();
     const { searchParams } = new URL(req.url);
@@ -57,3 +58,7 @@ export async function GET(req) {
     );
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const GET = tenantRoute(handleGET);

@@ -7,22 +7,28 @@ rules that must not be broken, the UI vocabulary, and the known landmines.
 
 Paste the whole file, or paste §1–§6 plus the section relevant to your task.
 
-**Last verified: 2 October 2026.** When you change the shape of the data, the
-posting rules, or the page conventions, update this file in the same commit.
-A stale context file is worse than none — it will confidently mislead.
+**Last verified: 8 October 2026.** When you change the shape of the data, the
+posting rules, the auth or tenancy rules, or the page conventions, update this
+file in the same commit. A stale context file is worse than none — it will
+confidently mislead.
+
+> **If you read nothing else, read §6.14 and §6.15.** This app now serves more
+> than one firm from one deployment. Every query is scoped to the signed-in
+> firm, and the mechanism that does it is not obvious from reading a route.
 
 ---
 
 ## 1. What Vyapaar is
 
-A **GST billing and accounting app for a small Indian trading business.** It
+A **GST billing and accounting app for small Indian trading businesses.** It
 replaces desktop accounting software of the SIGFA/Tally generation, so its
 screens deliberately echo those: dense keyboard-driven grids, Dr/Cr columns,
-HSN summaries. The pilot customer is a textiles trader (the name is currently
-hard-coded into the ledger header — see §9.7).
+HSN summaries.
 
-It is in **prototype stage, being tested by a single real customer.** It is
-not multi-tenant and has no sign-in (see §9).
+It is **multi-tenant**: one deployment serves many firms, each signing in to
+see only its own books. Sign-in, roles and per-firm data scoping all exist —
+see §6.14 and §6.15. It is still young; §9 is the honest list of what is not
+finished.
 
 What it does:
 
@@ -33,10 +39,13 @@ What it does:
 | Money | Receipt/payment vouchers |
 | Reports | Party ledger, Stock (item) ledger, Voucher register, Invoice print, Date-range invoice print |
 | Extras | AI invoice-image import (separate Python service), email invoice |
+| Account | Sign in, sign up a new firm, roles (owner / accountant / biller) |
 
 **Vocabulary.** "Party" = customer or supplier; both live in the same
 `customers` collection. "Voucher" = a receipt or payment entry, not an invoice.
-"Item ledger" = stock ledger. Dr = debit, Cr = credit.
+"Item ledger" = stock ledger. Dr = debit, Cr = credit. **"Firm" / "tenant" /
+"company"** all mean one subscribing business — the `companies` collection,
+and the `companyId` that every other row carries.
 
 ---
 
@@ -53,10 +62,31 @@ npm test           # the full test suite — run this before you call anything d
 
 ```
 MONGO_URI=mongodb+srv://...      # REQUIRED. Must be a replica set (Atlas is one) — see §6.7
+AUTH_SECRET=<48+ random bytes>   # REQUIRED. Signs the session cookie (§6.15).
+                                 # Without it EVERY page returns 500 — the gate
+                                 # fails closed rather than letting requests past
+                                 # unverified. Generate one with:
+                                 #   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+SIGNUP_DISABLED=true             # optional; closes self-serve sign-up so you
+                                 # onboard firms yourself
 RESEND_API_KEY=...               # optional, only for emailing an invoice
 INVOICE_FROM_EMAIL=...           # optional; an address on a Resend-verified domain.
                                  # Without it, mail only reaches the Resend account owner.
 NEXT_PUBLIC_AI_IMPORT_URL=...    # optional; the backend/ invoice-image service
+```
+
+**First run.** There is no seeded account, by design — a shipped
+`admin/admin123` is the first thing anyone tries on a deployed app. Go to
+`/signup`: it creates the firm and its first owner together and signs you in.
+Everything else redirects to `/login`.
+
+**Upgrading a database that predates multi-tenancy.** Existing rows have no
+`companyId`, and every query now filters on it, so until you run this the old
+books are *invisible — not lost*:
+
+```bash
+npm run adopt:tenant          # dry run: shows what it would adopt
+npm run adopt:tenant:apply    # backs up first, then stamps every row
 ```
 
 The Python AI-import service in `backend/` is separate and optional:
@@ -85,8 +115,21 @@ cd backend && pip install -r requirements.txt && uvicorn app:app --reload
 - `.mjs` files in `lib/` are **pure, dependency-free modules** that must run
   under bare `node` (the tests import them directly). **Never import Mongoose
   or a model into a `.mjs` file in `lib/`** unless it is already there —
-  `lib/cashAccount.mjs`, `lib/itemLedger.mjs` and `lib/runningBalances.mjs` are
-  the three that do, and they are therefore not unit-testable.
+  `lib/cashAccount.mjs`, `lib/itemLedger.mjs`, `lib/runningBalances.mjs`,
+  `lib/tenantPlugin.mjs`, `lib/tenantRoute.mjs` and `lib/authServer.mjs` are
+  the ones that do, and they are therefore not unit-testable. Each of them has
+  its decisions split into a pure neighbour that *is* tested
+  (`tenantPlugin` → `tenantScope.mjs`, auth → `roles/session/password`).
+  Do the same if you add another.
+- **Three modules have a runtime constraint beyond purity:**
+  `lib/session.mjs` and `lib/roles.mjs` are imported by `middleware.js`, which
+  runs on the **edge**, where `node:crypto` does not exist — that is why
+  sessions are signed with Web Crypto (`crypto.subtle`) and why those two files
+  import nothing at all. `lib/passwordRules.mjs` exists because the sign-up
+  page is a client component and `lib/password.mjs` imports `node:crypto`,
+  which cannot be bundled for a browser.
+- `lib/tenantContext.mjs` uses `node:async_hooks`. It is **server-only** —
+  never import it from a client component or from the middleware.
 - Also shipped as an **Electron desktop app** (`main.js`) that simply loads the
   deployed Vercel URL in a window. A **Capacitor** config exists but is unused.
 - `next.config.mjs` sets `eslint.ignoreDuringBuilds: true` — lint errors will
@@ -104,7 +147,7 @@ app/
   saleadd/               Sale invoice entry          ─┐
   salereturn/            Sale return entry            │ four near-identical
   purchaseadd/           Purchase invoice entry       │ ~1,100-line pages
-  purchasereturn/        Purchase return entry       ─┘ (see §9 — they have drifted)
+  purchasereturn/        Purchase return entry       ─┘ (see §9.8 — change all four)
   invoice/               Printable invoice (loads by ?invoiceNo=N)
   invoice-range/         Batch print invoices over a date range
   ledger/                Party ledger report
@@ -113,9 +156,16 @@ app/
   voucheradd/            Voucher entry
   customeradd/           Party master form
   itemadd/               Item master form
-  setup/                 Feature toggles + "clear all data"
+  setup/                 Feature toggles + the danger zone (§7)
   upload/                AI invoice-image import
+  login/                 Sign-in
+  signup/                Create a firm and its first owner
   api/<name>/route.js    All API routes (§7)
+  api/auth/*             login, logout, register, me — the only unscoped routes
+
+middleware.js            The gate. Runs at the EDGE on every request: verifies
+                         the session cookie's signature and expiry, and whether
+                         the role may reach the path. No database — see §6.15.
 
 components/
   InvoiceDocument.jsx    The printable invoice body. `forwardRef`, props
@@ -127,6 +177,10 @@ components/
                          stored totals.
   PriceListMaster.jsx    Party price list entry grid (modal)
   HsnMaster.jsx          HSN master (modal)
+  CustomerGroupMaster.jsx Customer group master (modal); Cash and Bank reserved
+  PartyBalance.jsx       City + running balance, under a customer picker
+  ItemStock.jsx          Current stock, under a selected invoice line
+  UserMenu.jsx           Who is signed in, and sign out
   ui/                    shadcn primitives: button, input, dialog, popover, tabs…
   Backbutton / NextButton / ReloadButton / suspense wrappers
 
@@ -143,8 +197,18 @@ lib/                     ← THE DOMAIN LAYER. Read §6 before touching any of i
   gst.mjs                CGST/SGST split, GST state-code normalisation
   hsnTotals.mjs          HSN code-wise summary, derived from line items
   priceList.mjs          Party price list resolution
-  company.mjs            The firm's own name/address/GSTIN — ONE place. Every
-                         document header reads it from here
+  company.mjs            ⚠ LEGACY. A hard-coded single firm's letterhead. With
+                         more than one firm this is wrong — the letterhead
+                         should come from the firm's `companies` row (§9.1)
+  tenantContext.mjs      Which firm this request is for (AsyncLocalStorage)
+  tenantScope.mjs        The scoping decisions, pure and tested
+  tenantPlugin.mjs       Mongoose plugin: adds companyId and scopes every query
+  tenantRoute.mjs        The one-line wrapper every API route uses
+  roles.mjs              Roles, permissions, path → permission (pure, edge-safe)
+  session.mjs            Signed session cookie (Web Crypto — edge-safe)
+  password.mjs           scrypt hashing          (node:crypto, server only)
+  passwordRules.mjs      The length rule alone   (browser-safe)
+  authServer.mjs         requireAuth(): the database-backed guard
   mongodb.js             Cached connection
   localStorageHelper.js  Invoice draft persistence
   utils.js               `cn()` — clsx + tailwind-merge
@@ -159,8 +223,14 @@ backend/                 FastAPI + Gemini invoice-image extraction (separate ser
 
 ## 5. Data model
 
-Ten collections. **There are no foreign keys — parties and items are joined by
-NAME**, which is why renames cascade (§6.10) and why name uniqueness matters.
+Thirteen collections. **There are no foreign keys — parties and items are
+joined by NAME**, which is why renames cascade (§6.10) and why name uniqueness
+matters.
+
+**Every collection below except `companies` and `users` carries a required,
+indexed `companyId`.** You will not find it in the schema files: it is added
+by `tenantPlugin` (§6.14), which also scopes every query to it. Do not add it
+by hand, and do not filter on it by hand either.
 
 ### `customers` (`models/custModel.js`) — parties AND cash/bank accounts
 
@@ -244,13 +314,33 @@ One document per sale / purchase / return.
 
 ### `hsn`, `Counter`, `TotalSale`
 
-- `hsn`: `hsncode` (unique), `hsnname`, `gst`, `gstunit`
-- `Counter`: `{ name, value }` — only `name: 'invoiceNo'` is used
-- `TotalSale`: legacy, effectively unused
+- `hsn`: `hsncode`, `hsnname`, `gst`, `gstunit`. Unique per firm
+- `Counter`: `{ name, value }` — only `name: 'invoiceNo'` is used. Unique per
+  firm, so each firm's numbering runs independently
+- `TotalSale`: legacy, effectively unused. The only model with no tenant plugin
+
+### `companies` (`models/companyModel.js`) — the tenant
+
+One row per subscribing firm: `name`, `gstin`, `phone`, `email`, `address`,
+`city`, `state`, `stateCode`, `pincode`, bank details, `active`.
+
+This is what `lib/company.mjs` used to be as a constant. Deliberately **not**
+unique on `name` — two unrelated shops may genuinely share one.
+
+### `users` (`models/userModel.js`) — who can sign in
+
+`email` (lowercased), `name`, `passwordHash` (`select: false`, so it is never
+returned unless asked for), `role`, `companyId`, `tokenVersion`, `active`,
+`lastLoginAt`.
+
+A user belongs to exactly **one** firm; staff at two firms get two accounts.
+`{ companyId, email }` is unique, case-insensitively — scoped to the firm, not
+global, so one address can be used at two firms. `tokenVersion` is the
+revocation handle: bumping it invalidates every session that user holds (§6.15).
 
 ---
 
-## 6. The accounting rules — DO NOT BREAK THESE
+## 6. The rules — DO NOT BREAK THESE
 
 **This is the most important section of the file.** Everything below was
 written to fix a real bug that corrupted real books. If you are changing
@@ -407,12 +497,127 @@ walking away must not burn a number. The number is only claimed on save, where
 `{ rate, discount, mrp, unit, source }`, falling back to the item master
 **field by field** — a row with only a discount still bills at the master rate.
 
+### 6.14 Every query is scoped to one firm — automatically
+
+**The single most important thing to understand before touching a route.**
+
+When this became multi-tenant there were **135 model call sites across 49
+files**. Adding `companyId` to each by hand would have been 135 chances to miss
+one, and a missed filter is invisible until a customer sees another customer's
+ledger. So scoping is not written at the call sites at all:
+
+| File | Does |
+|---|---|
+| `lib/tenantContext.mjs` | Holds the current firm in an `AsyncLocalStorage` |
+| `lib/tenantPlugin.mjs` | Applied to all 11 tenant schemas. Adds `companyId`; injects it into the filter of every read, update and delete; stamps it onto every create |
+| `lib/tenantRoute.mjs` | The wrapper that establishes the firm for one request |
+| `lib/tenantScope.mjs` | The decisions, pure and tested |
+
+So a route does not remember to scope its queries — **it cannot forget**:
+
+```js
+// get-item/route.js. This reads only the signed-in firm's items.
+const item = await Item.find({});
+```
+
+**The safety property: a query with no firm in context throws.** It does not
+fall back to "all firms". A route that is not wrapped fails on its first
+request with a 500 naming the collection, which gets noticed — as opposed to a
+silent cross-tenant read, which does not.
+
+**Rules:**
+
+1. **Every route under `app/api/` must export through `tenantRoute`.** The
+   pattern is a plain handler plus one export:
+   ```js
+   import { tenantRoute } from "@/lib/tenantRoute.mjs";
+
+   async function handleGET(req, auth) { /* auth.companyId, auth.role, auth.userId */ }
+
+   export const GET = tenantRoute(handleGET);
+   ```
+   The only exemptions are `app/api/auth/*`, because signing in happens before
+   anyone belongs to a firm.
+2. **Every tenant model must call `schema.plugin(tenantPlugin)` before it is
+   compiled.** Only `companyModel`, `userModel` and the dead `totalSales` do not.
+3. **Never write `companyId` into a filter yourself.** The plugin applies it
+   last, so a hand-written one is at best redundant and at worst misleading.
+4. **Never use `estimatedDocumentCount()` on a tenant collection.** It reads
+   collection metadata, so it cannot be scoped at all.
+5. `runAcrossAllTenants()` exists for the migration script and nothing else.
+   It is deliberately awkward to type and easy to grep for.
+
+`scripts/tenant-scope.test.mjs` statically sweeps every route file and every
+model and **fails the build if one is unwrapped or unplugged.** Run `npm test`
+after adding either.
+
+Unique indexes are **per firm**, not global: `invoiceNo`, `hsncode`, group
+names, state names and codes, and the invoice counter are all
+`{ companyId, <field> }`. A global unique meant the second firm to open could
+not write invoice 1.
+
+### 6.15 Authentication and roles
+
+Two separate questions, deliberately answered in two places:
+
+| Question | Answered by |
+|---|---|
+| Are you signed in, and to which firm? | `lib/session.mjs` |
+| May your role do this? | `lib/roles.mjs` |
+
+**Sessions are stateless.** A signed cookie (`vyapaar_session`, httpOnly,
+sameSite lax, secure in production) carrying `{ uid, cid, role, v, exp }`,
+HMAC-signed with `AUTH_SECRET`. No sessions collection, so checking a request
+costs no database round trip.
+
+**Two layers, and the difference matters:**
+
+- **`middleware.js` is the gate.** Edge runtime. Checks signature, expiry and
+  role-for-path. It *cannot* check whether the user still exists, is still
+  active, or has been revoked — that needs a database.
+- **`requireAuth()` in `lib/authServer.mjs` is the lock.** Called by
+  `tenantRoute` on every request. Re-reads the user, confirms the firm matches,
+  confirms `tokenVersion` still matches, and checks the permission against the
+  **role on the user record**, never the one in the token — so a role changed
+  mid-session takes effect on the next request, not in a week.
+
+**Roles:**
+
+| Role | Holds |
+|---|---|
+| `owner` | Everything, including Setup and the danger zone |
+| `accountant` | Invoices, vouchers, ledger, masters, reports |
+| `biller` | Invoices, and reading the masters a bill needs. No ledger, no master edits, no Setup |
+
+`permissionForPath()` maps a path to the permission it demands. **An
+unlisted `/api/` path defaults to `setup:write` — owner-only.** A route added
+later and never listed fails closed rather than being wide open. Add your route
+to `PATH_RULES` when you add it.
+
+**Revocation.** Signing out only clears the cookie; the token stays valid until
+it expires. To actually lock someone out, bump their `tokenVersion`.
+
+**Passwords** are scrypt (`node:crypto`, no native build to break on Windows),
+with the cost parameters stored inside the hash so raising them later does not
+lock anyone out. Sign-in verifies against a dummy hash even when no account
+exists, so a wrong address and a wrong password take the same time.
+
 ---
 
 ## 7. API routes
 
-All under `app/api/<name>/route.js`. **All are unauthenticated** (§9).
+All under `app/api/<name>/route.js`. **All are wrapped in `tenantRoute`
+(§6.14) except `app/api/auth/*`** — they require a session, check the path's
+permission, and see only the signed-in firm's rows.
 Most mutations are `POST`, including deletes (id in the query string).
+
+### Auth
+| Route | Method | Notes |
+|---|---|---|
+| `auth/register` | POST | Creates a firm and its first owner together, in one transaction, and signs them in. Honours `SIGNUP_DISABLED` |
+| `auth/login` | POST | Same message for every failure. Upgrades an old password hash while the plain password is in hand |
+| `auth/logout` | POST | Clears the cookie. Does **not** revoke the token — see §6.15 |
+| `auth/me` | GET | Who am I, which firm, and the permission list the nav uses to hide what you cannot reach |
 
 ### Invoices
 | Route | Method | Notes |
@@ -438,14 +643,30 @@ derive their balance deltas from `buildVoucherBalanceDeltas()`.
 
 Delete routes refuse with **409** when history references the record:
 `delete-cust` checks invoices, vouchers and ledger rows; `delete-hsn` checks
-items using that code; `delete-item` checks invoices (weakly — see §9.4).
+items using that code; `delete-item` checks invoices by name and refuses
+when stock movements exist (§9.7).
 `delete-price-list` is the exception and always succeeds, because invoices keep
 the rate they were billed at and nothing else references a list.
 
 ### Reports and other
 `ledger` (GET `?customerId=<id|0>`), `item-ledger` (GET `?itemId=<id|0>`),
 `send-email` (POST, Resend),
-`clear-all-data` (DELETE — requires body `{"confirm": "DELETE ALL DATA"}`).
+`clear-all-data` (DELETE — body `{"confirm": "DELETE ALL DATA"}`),
+`clear-transactions` (DELETE — body `{"confirm": "CLEAR TRANSACTIONS"}`),
+`item-stock` (GET — current stock per item, summed from the stock ledger).
+
+**The danger zone** lives in `/setup` and is owner-only. Two buttons, two
+different confirmation phrases on purpose, so habit from typing one cannot fire
+the other:
+
+- **Clear Transactions** deletes invoices, vouchers, ledger rows, stock rows and
+  the counter, keeps every master, and **resets each party's `lastBal` to its
+  opening balance**. That last step is not optional: `lastBal` accumulates from
+  the documents being deleted, so skipping it leaves parties owing money for
+  invoices that no longer exist.
+- **Clear All Data** also deletes the masters.
+
+Both are scoped by the plugin, so they empty only the caller's own books.
 
 **Response shape.** `{ success: true, ... }` or `{ success: false, error }`.
 Not perfectly consistent across older routes; follow the one you are editing.
@@ -539,9 +760,17 @@ export default function MyPage() {
 
 ### 8.3 Patterns in use
 
-- **Every page is `'use client'`** (all 15 of them). Data is fetched in
-  `useEffect` from `/api/*`. There is no server-component data fetching, no
-  SWR, no React Query.
+- **Every page is `'use client'`** (all 17 of them, including `/login` and
+  `/signup`). Data is fetched in `useEffect` from `/api/*`. There is no
+  server-component data fetching, no SWR, no React Query.
+- A client page **cannot import anything that reaches `node:*` or Mongoose.**
+  `/signup` takes its password rule from `lib/passwordRules.mjs` rather than
+  `lib/password.mjs` for exactly this reason — the latter imports
+  `node:crypto` and the page would not build.
+- `components/UserMenu.jsx` in the header asks `/api/auth/me` for who is signed
+  in. It renders nothing when signed out, so the sign-in pages keep a bare
+  header. Hiding a nav link by permission is tidiness only — **every route
+  checks for itself; a hidden link is not a locked door.**
 - Anything reading `useSearchParams` must be wrapped in `<Suspense>` — see
   `components/suspense.jsx`, `LedgerSuspense.jsx`, `VoucherSearchparams.jsx`.
 - `alert()` is the error-reporting mechanism throughout. Not pretty, but
@@ -550,6 +779,19 @@ export default function MyPage() {
   `localStorage`, edited on `/setup`: `description`, `shipped`, `dispatch`,
   `calculateByPack`, `rollStationary`, `usePriceList`.
 - Invoice drafts persist to `localStorage` via `lib/localStorageHelper.js`.
+- **Context subtext under a picker** is a shared pattern, not a one-off:
+  `components/PartyBalance.jsx` under a customer dropdown shows
+  `Ludhiana · Current balance: ₹1,500.00 Dr (owes you)`, and
+  `components/ItemStock.jsx` under each selected invoice line shows
+  `In stock: 115 PCS`. Both are `.field-hint`, green for Dr / in stock, red
+  for Cr / out of stock. Two rules they share and a new one should copy:
+  **read from the master, not from the document** (an invoice embeds only
+  `{name, phone, email, custId}`, so reading the balance off it would show a
+  figure when writing a bill and nothing when editing one), and **show nothing
+  rather than a confident zero** when the record cannot be found.
+  The wording is account-aware: a cash or bank account reads `in hand` /
+  `in account`, never `owes you` — the drawer does not owe you the money, it
+  *is* the money.
 - **The print page loads by number** — `/invoice?invoiceNo=123` — and fetches
   the saved document. It used to carry the whole invoice in the query string,
   which blew past the request-header limit at ~20 line items. Never put document
@@ -564,18 +806,30 @@ export default function MyPage() {
 
 Honest list. Some are deliberate prototype trade-offs; none are secret.
 
-**Blocking before this is used by anyone but the pilot customer**
+**Blocking**
 
-1. **There is no authentication anywhere.** No login, no session, no API key, no
-   middleware. Every route is open to anyone with the URL, including
-   `clear-all-data` (which does at least require a confirmation phrase in the
-   body) and `get-customer`, which returns every party with PAN, Aadhaar, GST
-   number and bank details. There is also **no tenancy** — no `companyId` on any
-   model. Making this multi-tenant is a schema change across all ten models.
+1. **The letterhead is still one hard-coded firm.** `lib/company.mjs` holds a
+   single firm's name, address and GSTIN, and every printed invoice reads it —
+   so with more than one firm on the instance, **every firm's bills print the
+   wrong name.** The fix is to read the signed-in firm's `companies` row
+   instead and pass it into `InvoiceDocument`. Cosmetic rather than a data
+   leak, but not shippable. ⚠ Its `gstin` and `phone` are also still blank,
+   and a GST invoice without a GSTIN is not a valid tax invoice.
+2. **Tenant isolation has not been exercised against a real database.** The
+   scoping rules are unit-tested and the audit proves every route and model is
+   wired (§10), but nobody has yet signed up a second firm and confirmed its
+   customer list comes back empty. **Do that before onboarding a real second
+   customer.**
+3. **There is no way to add a second user from the UI.** An owner is created at
+   sign-up; accountant and biller accounts can currently only be made directly
+   in the database. An owner-only Staff page is the missing piece — the
+   permission (`user:manage`) and the route rule for `/users` already exist.
+4. ~~There is no authentication anywhere.~~ **Fixed.** Sign-in, roles, a gate
+   in `middleware.js` and per-firm scoping on every query — §6.14, §6.15.
 
 **Data integrity**
 
-2. **`customers.name` and `items.name` are indexed but NOT unique.** They are
+5. **`customers.name` and `items.name` are indexed but NOT unique.** They are
    the join key for every other collection, so a duplicate makes two parties'
    ledgers ambiguous permanently. Duplicates are refused at the application
    level in `customer-add` / `item-add` / `*-alter` (409, case-insensitive),
@@ -583,21 +837,22 @@ Honest list. Some are deliberate prototype trade-offs; none are secret.
    de-duplicate the existing data first, because Mongo builds a unique index
    over dirty data by silently failing, leaving you believing you are
    protected. The schema comments say the same.
-3. ~~Almost nothing is indexed.~~ **Fixed.** `Ledger`, `ItemLedger`,
+6. ~~Almost nothing is indexed.~~ **Fixed.** `Ledger`, `ItemLedger`,
    `Invoice`, `Voucher`, `customers` and `items` now carry indexes on the
    fields the reports and the posting routes actually query. New indexes build
    on first connection after deploy.
-4. ~~`delete-item` is weaker than its siblings.~~ **Fixed.** It now guards by
+7. ~~`delete-item` is weaker than its siblings.~~ **Fixed.** It now guards by
    item **name** (so AI-imported lines count) and refuses when stock movements
    exist.
 
 **Duplication — four copies of the billing screen**
 
-5. `saleadd`, `salereturn`, `purchaseadd` and `purchasereturn` are four
-   **1,128-line copies of the same screen**, currently differing only in the
+8. `saleadd`, `salereturn`, `purchaseadd` and `purchasereturn` are four
+   **~1,200-line copies of the same screen**, currently differing only in the
    two or three lines that set `type`, `return` and the page heading. All four
    use `resolveItemPricing()`, take the party's latest price list automatically,
-   and honour the `usePriceList` toggle in Setup.
+   honour the `usePriceList` toggle in Setup, and show the party's balance and
+   each line's stock (§8.3).
 
    They are in sync today, but nothing keeps them that way — **every change
    must be made four times, and they have drifted before.** The real fix is to
@@ -610,24 +865,33 @@ Honest list. Some are deliberate prototype trade-offs; none are secret.
 
 **Smaller things**
 
-6. `items.lastQuantity` is never maintained (§5). The stock *report* is correct
-   because it recomputes; the master field is stale.
-7. ~~The business's details are hard-coded in two places and disagree.~~
-   **Fixed.** Everything now reads `lib/company.mjs`. ⚠ **`gstin` and `phone`
-   in that file are blank and must be filled in** — blank fields are simply not
-   printed, so nothing false goes out, but a GST invoice without a GSTIN is not
-   a valid tax invoice.
-8. ~22 `console.log` calls and ~55 `alert()`s in production paths. `alert()` is
-   the app's only error-reporting mechanism.
-9. `save-invoice` spreads `{...body}` into `Invoice.create` — mass assignment.
-10. Master-data routes (`customer-add`, `item-add`, `hsn-*`, `delete-item`,
+9. **`items.lastQuantity` is never maintained and must never be read as stock.**
+   It looks like the counterpart of `customers.lastBal`, but nothing in the
+   posting path writes it — it is typed into the item master by hand and is
+   stale the moment anything is bought or sold. Current stock is
+   `openingQuantity + every receipt − every issue`, summed from the stock
+   ledger: `lib/itemStock.mjs` and `/api/item-stock`. Summed rather than read
+   off the newest row's `balanceQuantity`, because that column is a cache a
+   back-dated entry leaves stale.
+10. ~~The business's details are hard-coded in two places and disagree.~~
+    Partly fixed: they are now in one place, `lib/company.mjs` — but that place
+    is still a constant rather than the firm's own record. See item 1.
+11. ~22 `console.log` calls and ~55 `alert()`s in production paths. `alert()` is
+    the app's only error-reporting mechanism — including on the sign-in pages.
+12. `save-invoice` spreads `{...body}` into `Invoice.create` — mass assignment.
+    The tenant plugin stamps `companyId` afterwards, so a client cannot inject
+    another firm's id, but the rest of the field surface is still open.
+13. Master-data routes (`customer-add`, `item-add`, `hsn-*`, `delete-item`,
     `delete-hsn`) are **not** transactional. The money paths all are.
-11. Deployment URLs still disagree between `main.js` (Electron →
+14. Deployment URLs still disagree between `main.js` (Electron →
     `vyapaar-ten.vercel.app`) and the FastAPI CORS list
     (`vyapaar-aspx.vercel.app`). The AI-import URL is now configurable via
     `NEXT_PUBLIC_AI_IMPORT_URL` (defaulting to the Render deploy).
-12. `capacitor.config.ts` still says `com.example.app`; `README.md` is the
+15. `capacitor.config.ts` still says `com.example.app`; `README.md` is the
     untouched `create-next-app` template.
+16. The Electron build (`main.js`) loads the deployed URL in a window, so it
+    now shows the sign-in page like any browser. Nothing stores a session for
+    it beyond the embedded browser's own cookie jar.
 
 ---
 
@@ -637,11 +901,18 @@ Honest list. Some are deliberate prototype trade-offs; none are secret.
 npm test
 ```
 
-Runs nine suites in `scripts/`. **Run it after any change to `lib/` or to a
-posting route.** The suites that matter most:
+Runs **18 suites** in `scripts/`. **Run it after any change to `lib/`, to a
+posting route, or after adding any route or model at all** — two of the suites
+are static sweeps that fail the build on an unwrapped route. The suites that
+matter most:
 
 | Suite | Guards |
 |---|---|
+| `auth.test.mjs` | Roles, path permissions, password hashing, session signing. Includes the cases that must fail: a tampered token, an expired one, a biller reaching the ledger, an unlisted route falling open |
+| `tenant-scope.test.mjs` | Tenant scoping — including two firms in flight at once not seeing each other. **Statically sweeps every route file and every model and fails if one is unwrapped or unplugged** |
+| `clear-transactions.test.mjs` | That no master is ever in the delete list, and that balances go back to opening |
+| `item-stock.test.mjs` | Stock is opening + receipts − issues, and `lastQuantity` is never the answer |
+| `party-balance.test.mjs` | The balance shown on a bill resolves from the master, not the invoice snapshot |
 | `posting-invariants.test.mjs` | Replays the routes against an in-memory store. Asserts that posting-then-deleting leaves balances untouched and no rows behind, that every account's balance equals its own ledger rows, and that edits cancel exactly |
 | `posting-consistency.test.mjs` | Create/edit/delete derive the same figures |
 | `invoice-posting.test.mjs` | The two-leg posting rule |
@@ -663,12 +934,23 @@ A test that cannot fail is worth nothing.
 commit, and a timestamped JSON backup under `backups/`.
 
 ```bash
+npm run adopt:tenant                # stamp pre-tenancy rows with a companyId (§2)
 npm run migrate:balances            # then :apply
 npm run rebuild:voucher-ledger      # rebuild ledger rows from vouchers
 npm run backfill:hsn-totals         # repair hsnTotals on old invoices
+npm run migrate:phone               # phone/pincode Number -> String
+npm run blank:zeros                 # clear meaningless zero defaults
+npm run seed:groups                 # customer group master, incl. Cash and Bank
+npm run seed:states                 # GST state master
+node scripts/check-duplicates.mjs   # report duplicate names in every master
+                                    # (no npm alias; the only one without one)
 npm run clear:zero-units
-npm run reset:data
+npm run reset:data                  # add --keep-masters for transactions only
 ```
+
+`adopt-tenant` refuses to guess when more than one firm exists: pass
+`--company <id>`. Picking the wrong one hands one firm's ledger to another and
+nothing in the app would flag it.
 
 ---
 
@@ -679,11 +961,34 @@ npm run reset:data
 1. `app/<name>/page.js`, `'use client'`, default export.
 2. Build it from the §8.2 template and the §8.1 class vocabulary.
 3. Fetch from an existing `/api/*` route if one fits; otherwise add
-   `app/api/<name>/route.js` returning `{ success, ... }`.
-4. Link it from `app/page.js` (a `.nav-tile`) and/or `app/layout.js` if it is
+   `app/api/<name>/route.js` returning `{ success, ... }` — **wrapped in
+   `tenantRoute`** (next recipe).
+4. **Add the page to `PATH_RULES` in `lib/roles.mjs`** with the permission it
+   demands. An unlisted page is reachable by anyone signed in; an unlisted
+   `/api/` route is owner-only.
+5. Link it from `app/page.js` (a `.nav-tile`) and/or `app/layout.js` if it is
    top-level.
-5. If it reads `useSearchParams`, wrap in `<Suspense>`.
-6. If it shows money, use `.num` and `toFixed(2)`.
+6. If it reads `useSearchParams`, wrap in `<Suspense>`.
+7. If it shows money, use `.num` and `toFixed(2)`.
+8. **Do not import `lib/password.mjs`, `lib/tenantContext.mjs` or anything that
+   imports Mongoose into a `'use client'` page.** It will not bundle. Use
+   `lib/passwordRules.mjs` for the password rule.
+
+### Add a new API route
+
+```js
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
+
+async function handlePOST(req, auth) {
+  // auth.companyId, auth.role, auth.userId, auth.company
+  // Every model query here is already scoped. Do NOT add companyId yourself.
+}
+
+export const POST = tenantRoute(handlePOST);
+```
+
+Then add its path to `PATH_RULES` in `lib/roles.mjs`, and run `npm test` —
+`tenant-scope.test.mjs` fails if the route is not wrapped.
 
 ### Add a field to an existing document
 
@@ -703,6 +1008,22 @@ Follow the HSN or price-list pattern: model in `models/`, four routes
 `components/`, and wiring in `app/page.js`. Delete routes must refuse when
 history references the record.
 
+**The model must apply the tenant plugin before it is compiled:**
+
+```js
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
+// ...schema definition...
+thingSchema.plugin(tenantPlugin);
+
+// Any unique index must be per firm, never global:
+thingSchema.index({ companyId: 1, name: 1 }, { unique: true });
+
+const Thing = mongoose.models.things || mongoose.model("things", thingSchema);
+```
+
+A global `unique: true` means the first firm to use a value takes it from every
+other firm. `npm test` fails if the plugin is missing.
+
 ### Change anything about posting
 
 1. Read §6 in full.
@@ -711,13 +1032,27 @@ history references the record.
 4. Add a case to `posting-invariants.test.mjs`.
 5. `npm test`.
 
+### Change anything about auth or tenancy
+
+1. Read §6.14 and §6.15 in full.
+2. Put the decision in a **pure** module — `lib/roles.mjs`,
+   `lib/tenantScope.mjs`, `lib/passwordRules.mjs` — not in the route, the
+   plugin or the middleware. Those three are glue.
+3. If the middleware will touch it, it must not import `node:*` or Mongoose.
+4. Add a case to `auth.test.mjs` or `tenant-scope.test.mjs`, **then break the
+   source and watch it fail.** A test that cannot fail is worth nothing, and
+   here it is worth less than nothing — it is a false assurance about the thing
+   keeping customers' books apart.
+
 ---
 
 ## 12. Prompt to paste into ChatGPT or Gemini
 
-> I'm working on **Vyapaar**, a Next.js 16 + MongoDB GST billing app for a small
-> Indian business. I'm pasting its context file below. Read it fully before
-> answering — especially §6, the accounting rules.
+> I'm working on **Vyapaar**, a Next.js 16 + MongoDB GST billing app that
+> serves several small Indian trading firms from one deployment. I'm pasting
+> its context file below. Read it fully before answering — especially §6, and
+> above all §6.14 (every query is scoped to one firm, automatically) and §6.15
+> (auth and roles).
 >
 > Constraints: **JavaScript, not TypeScript. React 18. Mongoose. Tailwind plus
 > the component classes in §8.1 — do not hand-roll styling or hard-code
@@ -725,10 +1060,17 @@ history references the record.
 > `{ session }` to every query inside it. Create, edit and delete must derive
 > their figures from the same function in `lib/`.
 >
+> **Multi-tenancy rules you must follow:** every API route exports through
+> `tenantRoute`; every tenant model applies `tenantPlugin`; **never add
+> `companyId` to a query filter yourself** — the plugin does it, and a
+> hand-written one is at best redundant. Any unique index is
+> `{ companyId, field }`, never global. New routes go in `PATH_RULES` in
+> `lib/roles.mjs`.
+>
 > When you give me code, give me **complete files or exact
 > find-and-replace blocks** — I'll be pasting them in by hand, so partial
 > snippets with "..." are not useful. Tell me every file that needs to change,
-> including the three sibling billing pages if you touch one of them (§9.5).
+> including the three sibling billing pages if you touch one of them (§9.8).
 >
 > My task: _<describe it here>_
 >
@@ -739,4 +1081,6 @@ history references the record.
 Then paste the specific source files the task touches. For a billing change
 that is usually `lib/balance.mjs`, `lib/invoicePosting.mjs` and the route you
 are editing; for a UI change, `app/globals.css` plus the nearest existing page
-as a style reference.
+as a style reference; for anything touching routes or models, also
+`lib/tenantRoute.mjs` and `lib/tenantPlugin.mjs` so the assistant copies the
+right shape.

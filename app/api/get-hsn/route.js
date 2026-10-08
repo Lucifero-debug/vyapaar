@@ -1,8 +1,9 @@
 // app/api/get-hsn/route.js
 import {connect} from '../../../lib/mongodb'
 import Hsn from '@/models/hsnModel';
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
-export async function GET() {
+async function handleGET(req, auth) {
   try {
     await connect();
 
@@ -19,3 +20,7 @@ export async function GET() {
     });
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const GET = tenantRoute(handleGET);

@@ -3,9 +3,10 @@ import {connect} from '../../../lib/mongodb'
 import Customer from '../../../models/custModel'
 import { toSigned, modeOf } from '@/lib/balance.mjs'
 import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 
-export async function POST(req) {
+async function handlePOST(req, auth) {
     try {
         await connect()
         const customerData = await req.json();
@@ -69,3 +70,7 @@ export async function POST(req) {
         return NextResponse.json({error:error.message},{status:500})
     }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const POST = tenantRoute(handlePOST);

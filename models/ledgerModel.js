@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
 
 const ledgerSchema = new mongoose.Schema({
   customerName: {
@@ -44,6 +45,10 @@ const ledgerSchema = new mongoose.Schema({
 ledgerSchema.index({ customerName: 1, date: 1, _id: 1 });
 ledgerSchema.index({ voucherId: 1 });
 ledgerSchema.index({ account: 1 });
+
+// Every row belongs to one firm. The plugin adds companyId, scopes every
+// query to it, and stamps it onto everything created -- see lib/tenantPlugin.mjs.
+ledgerSchema.plugin(tenantPlugin);
 
 const Ledger = mongoose.models.Ledger || mongoose.model("Ledger", ledgerSchema);
 

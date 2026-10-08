@@ -3,8 +3,9 @@ import { connect } from "../../../lib/mongodb";
 import State from "../../../models/stateModel";
 import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
 import { normalizeStateCode } from "@/lib/states.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
-export async function POST(req) {
+async function handlePOST(req, auth) {
   try {
     await connect();
     const body = await req.json();
@@ -46,3 +47,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const POST = tenantRoute(handlePOST);

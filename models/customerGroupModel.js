@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
 
 // Re-exported so the routes can reach it from the model they already import.
 export { RESERVED_GROUPS, isReservedGroup } from "../lib/customerGroups.mjs";
@@ -17,7 +18,6 @@ const customerGroupSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, "Please provide a group name"],
-      unique: true,
       trim: true,
     },
     note: {
@@ -32,6 +32,13 @@ const customerGroupSchema = new mongoose.Schema(
 // already builds that index, and declaring it twice makes Mongoose 8 throw
 // "Schema already has an index on {name:1}" when the model is first evaluated —
 // which took the whole route down with a 500.
+
+// Every row belongs to one firm. The plugin adds companyId, scopes every
+// query to it, and stamps it onto everything created -- see lib/tenantPlugin.mjs.
+customerGroupSchema.plugin(tenantPlugin);
+
+// Unique per FIRM: two unrelated shops may both have a "Retail" group.
+customerGroupSchema.index({ companyId: 1, name: 1 }, { unique: true });
 
 const CustomerGroup =
   mongoose.models.customergroups ||

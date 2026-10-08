@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
 
 /**
  * One line of a party's price list, shaped like the row on the price-list
@@ -79,6 +80,10 @@ const priceListSchema = new mongoose.Schema({
 });
 
 priceListSchema.index({ party: 1, date: -1 });
+
+// Every row belongs to one firm. The plugin adds companyId, scopes every
+// query to it, and stamps it onto everything created -- see lib/tenantPlugin.mjs.
+priceListSchema.plugin(tenantPlugin);
 
 const PriceList = mongoose.models.pricelists || mongoose.model("pricelists", priceListSchema);
 

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from "../lib/tenantPlugin.mjs";
 import { type } from "os";
 
 
@@ -115,6 +116,10 @@ type:String,
 // then change this line to { unique: true }.
 customerSchema.index({ name: 1 });
 customerSchema.index({ group: 1 });
+
+// Every row belongs to one firm. The plugin adds companyId, scopes every
+// query to it, and stamps it onto everything created -- see lib/tenantPlugin.mjs.
+customerSchema.plugin(tenantPlugin);
 
 const Customer= mongoose.models.customers || mongoose.model("customers",customerSchema)
 

@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import {connect} from '../../../lib/mongodb'
 import Item from "../../../models/itemModel";
 import { findNameClash, normalizeName } from "@/lib/uniqueName.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 
-export async function POST(req) {
+async function handlePOST(req, auth) {
     try {
         await connect()
         const itemData = await req.json();
@@ -51,4 +52,7 @@ export async function POST(req) {
     }
       // Handle saving itemData to your database
   }
-  
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const POST = tenantRoute(handlePOST);

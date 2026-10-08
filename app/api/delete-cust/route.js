@@ -6,8 +6,9 @@ import Invoice from "../../../models/invoiceModel";
 import Voucher from "../../../models/voucherModel";
 import Ledger from "../../../models/ledgerModel";
 import PriceList from "../../../models/priceListModel";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
-export async function POST(req) {
+async function handlePOST(req, auth) {
   try {
     await connect();
 
@@ -101,3 +102,7 @@ export async function POST(req) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const POST = tenantRoute(handlePOST);

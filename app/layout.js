@@ -4,6 +4,7 @@ import "./globals.css";
 import Backbutton from "@/components/Backbutton";
 import ReloadButton from "@/components/ReloadButton";
 import { SaleOptionProvider } from '@/context/SaleOptionContext';
+import UserMenu from "@/components/UserMenu";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,6 +64,9 @@ export default function RootLayout({ children }) {
                 <Link href="/saleadd" className="btn btn-primary btn-sm">
                   New Sale
                 </Link>
+                {/* Renders nothing when signed out, so the sign-in page keeps
+                    a bare header. */}
+                <UserMenu />
               </nav>
             </div>
           </header>

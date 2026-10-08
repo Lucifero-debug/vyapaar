@@ -11,6 +11,7 @@ import {
   CLEAR_TRANSACTIONS_PHRASE,
   TRANSACTION_COLLECTIONS,
 } from "@/lib/clearData.mjs";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 /**
  * Clear the books, keep the masters.
@@ -32,7 +33,7 @@ const MODELS = {
   counters: Counter,
 };
 
-export async function DELETE(req) {
+async function handleDELETE(req, auth) {
   try {
     let body = {};
     try {
@@ -109,3 +110,7 @@ export async function DELETE(req) {
     );
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const DELETE = tenantRoute(handleDELETE);

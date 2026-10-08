@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connect } from "../../../lib/mongodb";
 import Counter from "../../../models/counterModel";
 import Invoice from "../../../models/invoiceModel";
+import { tenantRoute } from "@/lib/tenantRoute.mjs";
 
 /**
  * What the next invoice number will probably be — for display on the form.
@@ -14,7 +15,7 @@ import Invoice from "../../../models/invoiceModel";
  * It reads the counter as well as the highest invoice, because a number set by
  * hand on the form can run ahead of the counter.
  */
-export async function GET() {
+async function handleGET(req, auth) {
   try {
     await connect();
 
@@ -34,3 +35,7 @@ export async function GET() {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+// Signed in, permission checked, and every query below scoped to the
+// caller's own firm. See lib/tenantRoute.mjs.
+export const GET = tenantRoute(handleGET);
